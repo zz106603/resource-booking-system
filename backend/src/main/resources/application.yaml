@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: resource-booking-system
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/resource_booking}
+    username: ${DB_USERNAME:resource_booking}
+    password: ${DB_PASSWORD:local_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

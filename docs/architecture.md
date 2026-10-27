@@ -2,9 +2,9 @@
 
 ## 상태와 구조
 
-이 문서는 구현 전 설계 초안이다. 디렉터리, 의존성, 스키마 및 실행 명령은 아직 생성·검증되지 않았다. 기능과 수용 기준은 [requirements.md](requirements.md)를 따른다.
+이 문서의 도메인 구조와 데이터 모델은 구현 전 설계 초안이다. `backend/` 기본 애플리케이션, 의존성, 도메인 테이블 없는 Flyway 초기 마이그레이션과 PostgreSQL 환경 통합 테스트는 구성했다. 실행 명령과 실제 검증 결과는 [backend-setup.md](backend-setup.md), 기능과 수용 기준은 [requirements.md](requirements.md)를 따른다.
 
-단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 향후 `backend/`, `frontend/`, `docs/`로 구성하되 이번 작업에서는 `docs/`만 생성한다. 프런트엔드는 추후 React·TypeScript·Vite로 개발한다.
+단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 현재 `backend/`, `docs/`와 루트 `compose.yaml`로 구성한다. `frontend/`는 추후 React·TypeScript·Vite로 개발한다.
 
 요청 흐름은 HTTP API → 애플리케이션 서비스 → 도메인 규칙 및 영속성 → PostgreSQL이다. 기능별 `space`, `reservation` 패키지와 작은 공통 오류 처리 영역을 제안한다. 별도 Gradle 멀티모듈이나 범용 프레임워크는 도입하지 않는다.
 
@@ -51,23 +51,23 @@
 
 | 선택 | 이유·확인할 점 |
 | --- | --- |
-| Java 21, Spring Boot, Gradle | 요청된 기반. 호환되는 안정 버전·Gradle Wrapper를 초기화 시 확인하고 고정 |
+| Java 21, Spring Boot 3.5.16, Gradle 8.14.3 | 요청된 기반. 호환 범위 확인 후 Wrapper와 Boot BOM으로 버전 고정 |
 | PostgreSQL | 트랜잭션·행 잠금 및 실제 운영 DB와 같은 의미의 검증 |
-| Spring Data JPA 제안 | 일반 CRUD와 트랜잭션 통합을 단순화. 잠금·쿼리는 생성 SQL과 통합 테스트로 확인 |
-| Flyway 제안 | 스키마와 제약을 버전 관리. 자동 스키마 갱신에 의존하지 않음 |
+| Spring Data JPA | 초기 의존성으로 채택. 일반 CRUD와 트랜잭션 통합을 단순화. 향후 잠금·쿼리는 생성 SQL과 통합 테스트로 확인 |
+| Flyway | 초기 환경에 채택. 스키마와 제약을 버전 관리. Hibernate는 validate로 설정하고 자동 스키마 갱신에 의존하지 않음 |
 | JUnit 5, Testcontainers | 순수 규칙 테스트와 실제 PostgreSQL 통합·동시성 테스트 분리 |
 
 단위 테스트는 시간 경계·겹침·상태 전이를 확인한다. 통합 테스트는 마이그레이션, DB 제약, API 오류 계약, 롤백을 검증한다. 동시성 테스트는 독립 트랜잭션과 충분한 DB 연결을 확보하고 제한 시간 내 완료 여부와 최종 데이터를 확인한다. 테스트 격리를 통해 서로의 예약 데이터에 영향을 주지 않도록 한다.
 
-현재 Gradle Wrapper, 빌드 파일, Docker 설정, CI는 없다. 실행 가능한 빌드·테스트 명령은 아직 없으며 성공한 검증도 없다. 초기화 후 파일과 환경을 확인하고 실제 실행한 명령·결과만 문서화한다.
+Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 실제 빌드·환경 테스트·기본 실행 결과는 [backend-setup.md](backend-setup.md)에 기록한다. 도메인 및 동시성 테스트와 CI는 아직 구성하지 않았다.
 
 ## 구현 전에 확인할 미결정 사항
 
 1. 제안한 취소 정책(확정 예약은 시작 전만 취소 가능, 취소 예약은 시작 시각 경과 여부와 관계없이 재취소 200), 미래 예약 및 시간 정밀도 정책 확인.
 2. REST URL, 요청·응답·오류 스키마, 문자열 제한, 페이지 방식 및 필터 기본값 확정.
-3. Spring Boot·Gradle·PostgreSQL·Testcontainers 버전과 Java 21 호환성, Docker 실행 환경 확인.
-4. JPA·Flyway 채택 검토. 실제 구현 시 비관적 잠금과 대안을 비교하고 통합·동시성 테스트로 동시성 제어 방식 결정. 잠금 후보 검증 시 잠금 SQL, 격리 수준, 대기 제한 및 오류 매핑 확인.
+3. 초기 환경 버전과 Java 21·Docker 호환성은 확인했다. 향후 버전 갱신 시 동일 검증을 다시 수행한다.
+4. 실제 도메인 구현 시 비관적 잠금과 대안을 비교하고 통합·동시성 테스트로 동시성 제어 방식 결정. 잠금 후보 검증 시 잠금 SQL, 격리 수준, 대기 제한 및 오류 매핑 확인.
 5. 동시성 테스트 반복 횟수·병렬 수·연결 풀 크기와 재현 방법 결정.
-6. 초기화 후 실제 빌드·테스트 명령과 실행 시간을 기록하고, 이후 필요에 따라 CI 자동 검증 도입.
+6. 초기 환경 검증 명령은 backend-setup.md에 기록했다. 도메인 구현 후 검증 범위를 확장하고 필요에 따라 CI 자동 검증 도입.
 
-다음 작업은 위 정책과 개발 환경을 확인한 후 백엔드 최소 골격과 검증 가능한 첫 기능을 구성하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
+다음 작업은 위 미결정 정책을 확인한 후 검증 가능한 첫 도메인 기능을 구성하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
