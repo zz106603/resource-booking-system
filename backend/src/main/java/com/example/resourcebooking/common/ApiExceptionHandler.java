@@ -2,6 +2,7 @@ package com.example.resourcebooking.common;
 
 import java.util.List;
 
+import com.example.resourcebooking.space.InvalidPaginationException;
 import com.example.resourcebooking.space.SpaceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler(InvalidPaginationException.class)
+    ResponseEntity<ApiError> invalidPagination(InvalidPaginationException exception) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("INVALID_REQUEST", exception.getMessage(), List.of()));
+    }
 
     @ExceptionHandler(SpaceNotFoundException.class)
     ResponseEntity<ApiError> notFound(SpaceNotFoundException exception) {

@@ -161,6 +161,26 @@ class SpaceApiIntegrationTest {
         assertThat(response.getBody().path("code").asText()).isNotBlank();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"page=2147483647", "page=2147483647&size=20",
+            "page=1073741824&size=2", "page=2147483647&size=100"})
+    void 페이지_오프셋이_JPA_정수_한계를_초과하면_400을_반환한다(String query) {
+        var response = http.getForEntity("/api/spaces?" + query, JsonNode.class);
+        assertError(response, HttpStatus.BAD_REQUEST, "INVALID_REQUEST");
+        assertThat(count()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"page=2147483647&size=1", "page=1073741823&size=2",
+            "page=107374182&size=20", "page=21474836&size=100"})
+    void 지원_가능한_최대_오프셋의_페이지에_데이터가_없으면_200과_빈_목록을_반환한다(String query) {
+        create("공간", "", 1);
+        var response = http.getForEntity("/api/spaces?" + query, JsonNode.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().path("content").isEmpty()).isTrue();
+        assertThat(response.getBody().path("totalElements").asLong()).isEqualTo(1);
+    }
+
     @Test
     void DB에_필수값이나_양수_제약을_위반한_공간을_넣으면_저장되지_않는다() {
         assertThatThrownBy(() -> jdbc.update("insert into spaces(name, capacity) values ('A', 0)"))

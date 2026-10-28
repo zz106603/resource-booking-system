@@ -19,7 +19,7 @@
 
 등록 요청: `name`은 공백만으로 구성할 수 없는 최대 100자 문자열, `description`은 선택 문자열(null 허용, 최대 2,000자), `capacity`는 필수 양의 32비트 정수다. 소수·숫자 문자열 입력과 숫자·불리언의 문자열 자동 변환은 거부한다. 이름 중복은 허용하며 입력 문자열은 그대로 보존한다.
 
-상세·등록 응답은 `id`, `name`, `description`, `capacity`, `createdAt`을 반환한다. `createdAt`은 주입된 Clock으로 생성하고 PostgreSQL 정밀도에 맞춰 마이크로초로 정규화하는 UTC 시각이다. 목록은 `content`, `page`, `size`, `totalElements`, `totalPages`로 구성한다. 페이지는 0 이상, 크기는 1~100이며 기본값은 각각 0과 20이다. 빈 목록과 범위를 벗어난 페이지는 빈 content로 200을 반환한다. 클라이언트 정렬 옵션은 제공하지 않는다.
+상세·등록 응답은 `id`, `name`, `description`, `capacity`, `createdAt`을 반환한다. `createdAt`은 주입된 Clock으로 생성하고 PostgreSQL 정밀도에 맞춰 마이크로초로 정규화하는 UTC 시각이다. 목록은 `content`, `page`, `size`, `totalElements`, `totalPages`로 구성한다. 페이지는 0 이상, 크기는 1~100이며 기본값은 각각 0과 20이다. JPA의 오프셋 한계에 따라 `page × size`는 2,147,483,647 이하여야 하며 이를 초과하면 400(`INVALID_REQUEST`)을 반환한다. 이 지원 범위 안에서 빈 목록과 데이터 범위를 벗어난 페이지는 빈 content로 200을 반환한다. 클라이언트 정렬 옵션은 제공하지 않는다.
 
 없는 양의 ID는 404, 양수가 아닌 ID·잘못된 형식·필드·페이지 입력은 400이다. 공통 오류는 `code`, `message`, `fieldErrors`(각 항목은 `field`, `message`)를 포함하며 내부 예외나 SQL·스택 추적은 노출하지 않는다.
 
@@ -59,6 +59,14 @@ DB는 BIGINT IDENTITY 기본키, 필수값·양의 수용 인원·빈 이름 방
 2. 첫 전체 빌드는 테스트 35개 중 1개가 실패했다. 생성 응답의 나노초 시각과 PostgreSQL 재조회 시 마이크로초 반올림 결과가 달랐다. 주입된 Clock의 시각을 저장 전에 마이크로초로 정규화했고 생성·상세 응답 일치 테스트로 검증했다.
 3. 잘못된 JSON 타입 테스트 10개 중 추가한 3개가 실패했다. Jackson이 숫자 이름·설명과 숫자 문자열 수용 인원을 자동 변환하고 있었다. 명시적인 타입 변환 거부 설정을 추가했고 최종 전체 테스트에서 모두 통과했다.
 4. 기본 권한의 Docker 조회는 접근 거부였으며, Docker 접근이 허용된 실행에서 엔진 연결과 테스트를 수행했다. 테스트 JVM의 클래스 공유 경고는 있었으나 최종 테스트 실패는 없었다. 의도적인 DB 장애 테스트에서의 서버 오류 로그는 예상된 검증 과정이다.
+
+## Codex Review 후 페이지 오프셋 검증 (2026-10-28)
+
+[PR #3의 P2 지적](https://github.com/zz106603/resource-booking-system/pull/3#discussion_r4397183961)은 타당했다. `page=2147483647&size=20` 등 4개 요청이 컨트롤러 검증을 통과한 뒤 JPA의 `Page offset exceeds Integer.MAX_VALUE` 예외로 500을 반환하는 것을 실제 PostgreSQL·HTTP 재현 테스트로 확인했다. 지원 가능한 최대 경계의 4개 요청은 기존에도 200이었다.
+
+`SpaceService`에서 long 오프셋을 저장소 호출 전에 검사하고, 한계를 넘으면 전용 예외를 공통 400(`INVALID_REQUEST`) 응답으로 변환한다. 무조건 빈 목록으로 반환하는 대신 지원 범위를 계약에 명시했다. 지원 범위 안의 빈 페이지는 계속 200이다.
+
+수정 후 `backend/`에서 `.\gradlew.bat clean build --no-daemon`을 실행해 **BUILD SUCCESSFUL**(약 112초)을 확인했다. 총 47개 테스트(공간 API 45개, 기본 환경·마이그레이션 2개)가 통과했고 실패·오류·건너뜀은 모두 0이다. 재현·경계 테스트 8개를 추가했으며 문서 참조 및 공백 검사도 통과했다.
 
 ## 남은 작업
 

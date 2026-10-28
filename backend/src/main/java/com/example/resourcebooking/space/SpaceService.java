@@ -32,6 +32,10 @@ public class SpaceService {
     }
 
     public SpacePageResponse list(int page, int size) {
-        return SpacePageResponse.from(repository.findAll(PageRequest.of(page, size, Sort.by("id"))));
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("id"));
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            throw new InvalidPaginationException();
+        }
+        return SpacePageResponse.from(repository.findAll(pageRequest));
     }
 }
