@@ -2,7 +2,7 @@
 
 ## 범위와 작업 순서
 
-기준 문서는 [requirements.md](requirements.md)와 [architecture.md](architecture.md)다. 도메인 API·엔티티·프런트엔드는 구현하지 않는다.
+기준 문서는 [requirements.md](requirements.md)와 [architecture.md](architecture.md)다. 아래 작업 순서와 2026-10-27 검증 결과는 초기 환경 구성 당시 기록이다. 이후 추가한 공간 API의 계약과 검증 결과는 [space-api.md](space-api.md)에 기록한다.
 
 1. Java 21 기반 Gradle 빌드와 Wrapper를 구성한다.
 2. 실제 PostgreSQL에서 애플리케이션 시작·Flyway 적용을 확인하는 JUnit 5 테스트를 먼저 작성한다.
@@ -40,7 +40,7 @@ DB는 `127.0.0.1:15432`, 데이터베이스·사용자는 `resource_booking`, �
 .\gradlew.bat bootRun --no-daemon
 ```
 
-기본 HTTP 포트는 8080이다. 도메인 API가 없으므로 `/` 응답은 404이며, 시작 로그의 `Started ResourceBookingApplication`과 Flyway 적용 결과로 기동 여부를 확인한다. 종료는 Ctrl+C를 사용한다.
+기본 HTTP 포트는 8080이다. `/`에는 API가 없어 404이며, 공간 API는 `/api/spaces`에서 제공한다. 시작 로그의 `Started ResourceBookingApplication`과 Flyway 적용 결과로 기동 여부를 확인한다. 종료는 Ctrl+C를 사용한다.
 
 연결 설정은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경변수로 변경한다. DB 공개 포트를 변경하려면 Compose의 `POSTGRES_PORT`와 JDBC URL의 포트를 함께 맞춘다. `.env`는 Compose 보간에만 사용되며 Spring Boot에 자동 로드되지 않는다.
 
@@ -66,7 +66,7 @@ docker compose down
 
 `PostgresIntegrationTest`는 `@ServiceConnection`으로 별도 PostgreSQL 컨테이너의 동적 포트·자격 증명을 주입한다. Compose DB를 먼저 실행할 필요가 없으며 로컬 DB 데이터도 사용하지 않는다. Docker가 없으면 테스트는 실패하며 자동으로 건너뛰지 않는다.
 
-테스트는 임의 포트의 웹 애플리케이션 기동, 실제 PostgreSQL JDBC 연결 및 `select 1`, Flyway 버전 1 적용과 미적용 마이그레이션 부재를 확인한다. V1은 `SELECT 1`만 수행해 마이그레이션 경로와 이력을 설정하며 도메인 테이블은 만들지 않는다. 향후 스키마는 새 버전 파일로 추가한다. 이 테스트가 도메인 규칙·예약 동시성을 검증하는 것은 아니다.
+`PostgresIntegrationTest`는 임의 포트의 웹 애플리케이션 기동, 실제 PostgreSQL JDBC 연결 및 `select 1`, 최신 Flyway 버전 2 적용과 미적용 마이그레이션 부재를 확인한다. V1은 `SELECT 1`만 수행하고 V2가 공간 테이블을 추가한다. 향후 스키마는 새 버전 파일로 추가한다. `SpaceApiIntegrationTest`는 별도 PostgreSQL에서 공간 API를 검증한다. 예약·동시성 검증은 아직 포함하지 않는다.
 
 테스트 리포트는 `backend/build/reports/tests/test/index.html`, 실행 JAR는 `backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar`에 생성된다.
 
