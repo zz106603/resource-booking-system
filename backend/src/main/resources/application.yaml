@@ -1,6 +1,9 @@
 spring:
   application:
     name: resource-booking-system
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:15432/resource_booking}
     username: ${DB_USERNAME:resource_booking}

@@ -2,7 +2,7 @@
 
 ## 상태와 구조
 
-이 문서의 도메인 구조와 데이터 모델은 구현 전 설계 초안이다. `backend/` 기본 애플리케이션, 의존성, 도메인 테이블 없는 Flyway 초기 마이그레이션과 PostgreSQL 환경 통합 테스트는 구성했다. 실행 명령과 실제 검증 결과는 [backend-setup.md](backend-setup.md), 기능과 수용 기준은 [requirements.md](requirements.md)를 따른다.
+공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces` 테이블로 구현했다. 예약 구조와 데이터 모델은 구현 전 설계 초안이다. V1 초기 마이그레이션은 유지하며, 실행 안내는 [backend-setup.md](backend-setup.md), 공간 API 계약과 검증 결과는 [space-api.md](space-api.md), 기능과 수용 기준은 [requirements.md](requirements.md)를 따른다.
 
 단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 현재 `backend/`, `docs/`와 루트 `compose.yaml`로 구성한다. `frontend/`는 추후 React·TypeScript·Vite로 개발한다.
 
@@ -29,11 +29,11 @@
 | reservations | id, space_id, booker_name, start_at, end_at, status, created_at, cancelled_at | PK, 공간 FK, 필수값 NOT NULL, start_at < end_at, 상태 제한 |
 
 - 공간 1개에 예약 여러 개가 연결된다. 예약을 물리 삭제하지 않는다.
-- ID는 우선 DB 생성 BIGINT를 제안한다. 확장 요구가 생기면 재검토한다.
+- 공간 ID는 DB 생성 BIGINT IDENTITY를 채택했다. 예약 ID는 BIGINT를 제안하며 예약 구현 전 확정한다.
 - 시각은 PostgreSQL `timestamptz`, Java에서는 `Instant` 중심으로 취급한다. 원래 입력의 시간대 이름을 보존하는 요구는 없다.
 - `CONFIRMED`이면 cancelled_at은 NULL, `CANCELLED`이면 취소 시각을 기록한다. 기본 무결성은 DB 제약과 애플리케이션에서 함께 보장한다.
 - 조회·중복 확인용 `(space_id, status, start_at)` 인덱스를 후보로 두고 실제 쿼리와 실행 계획으로 확정한다. 인덱스 자체는 중복 예약을 막지 않는다.
-- 문자열 길이, 페이지 크기 및 최대 조회 구간은 API 계약과 함께 정한다.
+- 공간 이름은 VARCHAR(100), 설명은 선택 VARCHAR(2000), 목록은 ID 오름차순에 기본 20개·최대 100개 페이지를 적용했다. 예약 문자열 길이와 페이지 크기 및 최대 조회 구간은 예약 API 계약과 함께 정한다.
 
 ## 동시성 및 트랜잭션 제안
 
@@ -59,15 +59,15 @@
 
 단위 테스트는 시간 경계·겹침·상태 전이를 확인한다. 통합 테스트는 마이그레이션, DB 제약, API 오류 계약, 롤백을 검증한다. 동시성 테스트는 독립 트랜잭션과 충분한 DB 연결을 확보하고 제한 시간 내 완료 여부와 최종 데이터를 확인한다. 테스트 격리를 통해 서로의 예약 데이터에 영향을 주지 않도록 한다.
 
-Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 실제 빌드·환경 테스트·기본 실행 결과는 [backend-setup.md](backend-setup.md)에 기록한다. 도메인 및 동시성 테스트와 CI는 아직 구성하지 않았다.
+Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API는 실제 HTTP·PostgreSQL 통합 테스트로 검증하며 결과는 [space-api.md](space-api.md)에 기록한다. 초기 환경 검증 결과는 [backend-setup.md](backend-setup.md)에 보존한다. 예약·동시성 테스트와 CI는 아직 구성하지 않았다.
 
 ## 구현 전에 확인할 미결정 사항
 
 1. 제안한 취소 정책(확정 예약은 시작 전만 취소 가능, 취소 예약은 시작 시각 경과 여부와 관계없이 재취소 200), 미래 예약 및 시간 정밀도 정책 확인.
-2. REST URL, 요청·응답·오류 스키마, 문자열 제한, 페이지 방식 및 필터 기본값 확정.
+2. 공간 API 계약은 space-api.md에 정리했다. 예약 REST URL, 요청·응답·오류 스키마, 문자열 제한, 페이지 방식 및 필터 기본값은 미결정이다.
 3. 초기 환경 버전과 Java 21·Docker 호환성은 확인했다. 향후 버전 갱신 시 동일 검증을 다시 수행한다.
 4. 실제 도메인 구현 시 비관적 잠금과 대안을 비교하고 통합·동시성 테스트로 동시성 제어 방식 결정. 잠금 후보 검증 시 잠금 SQL, 격리 수준, 대기 제한 및 오류 매핑 확인.
 5. 동시성 테스트 반복 횟수·병렬 수·연결 풀 크기와 재현 방법 결정.
 6. 초기 환경 검증 명령은 backend-setup.md에 기록했다. 도메인 구현 후 검증 범위를 확장하고 필요에 따라 CI 자동 검증 도입.
 
-다음 작업은 위 미결정 정책을 확인한 후 검증 가능한 첫 도메인 기능을 구성하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
+다음 작업은 위 미결정 정책을 확인한 후 예약 기능과 동시성 제어를 구성하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
