@@ -37,6 +37,14 @@ jobs:
       - name: Build and run all tests
         run: ./gradlew clean build --no-daemon
 
+      - name: Upload executable JAR for security scan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-executable-jar
+          path: backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -45,5 +53,88 @@ jobs:
           path: |
             backend/build/reports/tests/test/
             backend/build/test-results/test/
+          if-no-files-found: warn
+          retention-days: 7
+
+  backend-security:
+    name: Backend JAR vulnerability scan
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      # Trivy v0.76.1; verified official signature before adopting this digest.
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository for SARIF paths
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download tested executable JAR
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: backend-executable-jar
+          path: backend/build/libs
+
+      - name: Scan runtime libraries and generate SARIF
+        env:
+          REPORT_DIR: ${{ runner.temp }}/trivy-reports
+        run: |
+          set -euo pipefail
+          test -s backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar
+          mkdir -p "$REPORT_DIR"
+          # Match the runner-owned bind mount without restoring root capabilities.
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,src=$PWD/backend/build/libs,dst=/artifacts,readonly" \
+            --mount "type=bind,src=$REPORT_DIR,dst=/reports" \
+            "$TRIVY_IMAGE" rootfs --scanners vuln --pkg-types library \
+            --severity HIGH,CRITICAL --exit-code 0 --timeout 10m --no-progress \
+            --format json --list-all-pkgs --output /reports/trivy.json \
+            /artifacts/resource-booking-system-backend-0.0.1-SNAPSHOT.jar
+          # No recognized Java packages is a scan failure, not a clean result.
+          python3 - "$REPORT_DIR/trivy.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1]) as report:
+              results = json.load(report)["Results"]
+          if not any(r.get("Type") == "jar" and r.get("Packages") for r in results):
+              raise SystemExit("No Java packages detected")
+          if any(v["Severity"] not in {"HIGH", "CRITICAL"} for r in results for v in r.get("Vulnerabilities", [])):
+              raise SystemExit("Unexpected vulnerability severity")
+          PY
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,src=$REPORT_DIR,dst=/reports" \
+            "$TRIVY_IMAGE" convert --format sarif --severity HIGH,CRITICAL \
+            --output /reports/trivy.sarif /reports/trivy.json
+          python3 - "$REPORT_DIR/trivy.sarif" <<'PY'
+          import json, sys
+          with open(sys.argv[1]) as report:
+              sarif = json.load(report)
+          if sarif["version"] != "2.1.0" or not sarif["runs"]:
+              raise SystemExit("Invalid SARIF document")
+          if not all(r["tool"]["driver"]["name"] == "Trivy" and isinstance(r["results"], list) for r in sarif["runs"]):
+              raise SystemExit("Invalid Trivy SARIF run")
+          PY
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: ${{ runner.temp }}/trivy-reports/trivy.sarif
+          category: trivy-backend-jar
+          wait-for-processing: true
+
+      - name: Preserve security reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: backend-security-reports
+          path: ${{ runner.temp }}/trivy-reports/
           if-no-files-found: warn
           retention-days: 7
