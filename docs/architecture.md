@@ -2,7 +2,7 @@
 
 ## 상태와 구조
 
-공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces`, 예약 생성·취소는 `reservation` 패키지와 V3의 `reservations`로 구현했다. V4는 CONFIRMED 한정 배타 제약을 추가하며 V1~V3는 보존한다. 실행 안내는 [backend-setup.md](backend-setup.md), API 계약은 [space-api.md](space-api.md) 및 [reservation-api.md](reservation-api.md), 최신 동시성 설계·검증은 [reservation-concurrency.md](reservation-concurrency.md), 수용 기준은 [requirements.md](requirements.md)를 따른다. 예약 목록 AC10은 미구현·미검증이다.
+공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces`, 예약 생성·취소·목록은 `reservation` 패키지와 V3의 `reservations`로 구현했다. V4는 CONFIRMED 한정 배타 제약을 추가하며 V1~V3는 보존한다. 실행 안내는 [backend-setup.md](backend-setup.md), API 계약은 [space-api.md](space-api.md) 및 [reservation-api.md](reservation-api.md), 최신 동시성 설계·검증은 [reservation-concurrency.md](reservation-concurrency.md), 예약 목록 AC10의 계약·검증은 [reservation-list.md](reservation-list.md), 수용 기준은 [requirements.md](requirements.md)를 따른다.
 
 단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 현재 `backend/`, `docs/`와 루트 `compose.yaml`로 구성한다. `frontend/`는 추후 React·TypeScript·Vite로 개발한다.
 
@@ -33,7 +33,7 @@
 - 시각은 PostgreSQL `timestamptz`, Java에서는 `Instant` 중심으로 취급한다. 원래 입력의 시간대 이름을 보존하는 요구는 없다.
 - `CONFIRMED`이면 cancelled_at은 NULL, `CANCELLED`이면 취소 시각을 기록한다. 기본 무결성은 DB 제약과 애플리케이션에서 함께 보장한다.
 - V3의 `(space_id, status, start_at)` B-tree 인덱스는 보존한다. V4는 공간 동등성·tstzrange `[)` 겹침을 결합한 GiST 배타 제약을 CONFIRMED에만 적용한다. 중복 무결성의 최종 보장은 이 제약이며 실행 계획·부하 튜닝은 후속 과제다.
-- 공간 이름은 VARCHAR(100), 설명은 선택 VARCHAR(2000), 목록은 ID 오름차순에 기본 20개·최대 100개 페이지를 적용했다. 예약자명은 VARCHAR(100)이다. 예약 목록의 페이지 크기와 최대 조회 구간은 미결정이다.
+- 공간 이름은 VARCHAR(100), 설명은 선택 VARCHAR(2000), 목록은 ID 오름차순에 기본 20개·최대 100개 페이지를 적용했다. 예약자명은 VARCHAR(100)이다. 예약 목록은 시작 시각·ID 오름차순, 기본 20개·최대 100개 페이지와 선택 공간·상태·겹침 구간 필터를 사용한다. 최대 조회 기간은 두지 않는다.
 
 ## 동시성 및 트랜잭션 결정
 
@@ -51,6 +51,8 @@ V4는 테이블의 쓰기를 막은 상태에서 기존 활성 중복을 점검�
 
 ## 기술 선택 이유와 검증 방향
 
+예약 목록은 쓰기 재시도 서비스와 분리한 ReservationQueryService의 읽기 전용 REPEATABLE READ 트랜잭션에서 조회한다. JPA Specification으로 지정한 필터만 AND 결합하고 DB에서 정렬·페이징·건수를 계산한다. 같은 응답의 건수와 내용은 동일 스냅샷으로 읽되 서로 다른 페이지 요청 사이의 스냅샷은 보장하지 않는다. 예약 행 쓰기 잠금이나 새 스키마·인덱스는 추가하지 않는다.
+
 | 선택 | 이유·확인할 점 |
 | --- | --- |
 | Java 21, Spring Boot 3.5.16, Gradle 8.14.3 | 요청된 기반. 호환 범위 확인 후 Wrapper와 Boot BOM으로 버전 고정 |
@@ -66,10 +68,10 @@ Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontai
 ## 구현 전에 확인할 미결정 사항
 
 1. 시작 전 최초 취소, 시각과 무관한 재취소 성공, 미래 예약·마이크로초 정밀도는 구현 계약으로 채택했다. 인증·소유자 권한은 후속 과제다.
-2. 공간과 예약 생성·취소 API 계약은 각 문서에 정리했다. 예약 목록·페이지·필터 계약은 미결정이다.
+2. 공간과 예약 생성·취소 API 계약은 각 문서에 정리했다. 예약 목록·페이지·필터는 reservation-list.md의 승인 계약을 따른다. 커서 페이지와 조회 기간 제한은 추후 데이터·실행 계획 근거가 있을 때 검토한다.
 3. 초기 환경 버전과 Java 21·Docker 호환성은 확인했다. 향후 버전 갱신 시 동일 검증을 다시 수행한다.
 4. 배타 제약·예약 행 잠금·제한 재시도를 채택했다. 직접 SQL 무결성·실제 교착·재시도 소진·대기 후 시간 정책을 테스트하고 성능 보장은 별도로 검증한다.
 5. 동시 테스트는 8개 HTTP 요청과 기본 Hikari 최대 10개 연결, 같은 구간 생성 3회 반복으로 시작한다. 부하와 다중 인스턴스 규모의 검증은 후속 과제다.
 6. 실행·검증 및 CI 절차는 backend-setup.md에 기록했다. 도메인 구현 후 테스트 범위를 확장하고 원격 CI 실행 결과와 필수 상태 검사 설정을 확인한다.
 
-다음 작업은 예약 목록과 필터 계약을 정하고 구현하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
+인증·예약 소유자 권한, 운영 배포와 대규모 데이터 성능은 후속 과제다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.

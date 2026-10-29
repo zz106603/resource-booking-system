@@ -3,6 +3,7 @@ package com.example.resourcebooking.common;
 import java.util.List;
 
 import com.example.resourcebooking.reservation.ReservationException;
+import com.example.resourcebooking.reservation.InvalidReservationQueryException;
 import com.example.resourcebooking.reservation.ReservationRetryExhaustedException;
 import com.example.resourcebooking.space.InvalidPaginationException;
 import com.example.resourcebooking.space.SpaceNotFoundException;
@@ -25,6 +26,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler(InvalidReservationQueryException.class)
+    ResponseEntity<ApiError> invalidReservationQuery(InvalidReservationQueryException exception) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("INVALID_REQUEST", exception.getMessage(), List.of()));
+    }
 
     @ExceptionHandler(ReservationException.class)
     ResponseEntity<ApiError> reservationFailure(ReservationException exception) {

@@ -4,7 +4,7 @@
 
 공유 공간 예약 서비스를 완성하면서 Codex 작업 지침, 자동 검증, 실패 복구 및 Context 관리 방법을 실제 작업에 맞춰 점진적으로 개선한다. 백엔드 포트폴리오로 활용할 수 있도록 비즈니스 규칙과 통합·동시성 테스트의 근거를 남긴다.
 
-이 문서는 MVP 구현 기준안이다. 공간 등록·조회는 [space-api.md](space-api.md), 예약 생성·취소 및 중복 방지는 [reservation-api.md](reservation-api.md)에 계약과 실제 검증 결과를 기록한다. 예약 목록(AC10)은 아직 구현하지 않았다. 나머지 미결정 사항은 `architecture.md`에 기록한다.
+이 문서는 MVP 구현 기준안이다. 공간 등록·조회는 [space-api.md](space-api.md), 예약 생성·취소 및 중복 방지는 [reservation-api.md](reservation-api.md)에 계약과 실제 검증 결과를 기록한다. 예약 목록(AC10)의 승인 계약과 검증 결과는 [reservation-list.md](reservation-list.md)에 기록한다. 나머지 미결정 사항은 `architecture.md`에 기록한다.
 
 ## MVP 기능
 
@@ -36,7 +36,7 @@
 
 ## 검증 가능한 수용 기준
 
-공간 등록·조회 계약은 [space-api.md](space-api.md), 예약 생성·취소 계약은 [reservation-api.md](reservation-api.md)에 구체화했다. 예약 목록 계약은 구현 전에 확정한다. 잠금 시간 초과 같은 일시적인 DB 실패는 중복 충돌과 구분해 503으로 반환한다.
+공간 등록·조회 계약은 [space-api.md](space-api.md), 예약 생성·취소 계약은 [reservation-api.md](reservation-api.md)에 구체화했다. 예약 목록은 선택 공간·상태·조회 구간의 AND 필터, 시작 시각·ID 오름차순, 기본 page=0·size=20·최대 100을 적용한다. 조회 구간은 양끝을 함께 지정하며 과거와 기간 제한 없는 조회를 허용한다. 상세 입력·응답·오류 계약은 [reservation-list.md](reservation-list.md)를 따른다. 잠금 시간 초과 같은 일시적인 DB 실패는 중복 충돌과 구분해 503으로 반환한다.
 
 | ID | 조건과 행동 | 기대 결과 |
 | --- | --- | --- |
