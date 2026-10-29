@@ -61,7 +61,7 @@ V4는 테이블의 쓰기를 막은 상태에서 기존 활성 중복을 점검�
 
 단위 테스트는 시간 경계·겹침·상태 전이를 확인한다. 통합 테스트는 마이그레이션, DB 제약, API 오류 계약, 롤백을 검증한다. 동시성 테스트는 독립 트랜잭션과 충분한 DB 연결을 확보하고 제한 시간 내 완료 여부와 최종 데이터를 확인한다. 테스트 격리를 통해 서로의 예약 데이터에 영향을 주지 않도록 한다.
 
-Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API 결과는 [space-api.md](space-api.md), 예약 생성·취소와 동시성 검증 결과는 [reservation-api.md](reservation-api.md)에 기록한다. 초기 환경 검증 결과는 [backend-setup.md](backend-setup.md)에 보존한다. CI는 아직 구성하지 않았다.
+Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API 결과는 [space-api.md](space-api.md), 예약 생성·취소와 동시성 설계·검증 결과는 [reservation-api.md](reservation-api.md)와 [reservation-concurrency.md](reservation-concurrency.md)에 기록한다. 초기 환경 검증 결과와 CI 실행 절차는 [backend-setup.md](backend-setup.md)에 기록한다. GitHub Actions는 PR 생성·업데이트 및 main push에서 Java 21·Wrapper로 전체 빌드와 PostgreSQL 테스트를 실행하도록 구성했다. Docker 연결 실패는 CI 실패로 처리한다. 현재 예약 API 브랜치에는 예약 생성·취소, 동시성 및 교착 복구 테스트가 포함되며 동일한 CI 빌드 명령의 실행 대상이다. 이 통합 상태의 원격 CI 실행 결과는 아직 확인하지 않았다.
 
 ## 구현 전에 확인할 미결정 사항
 
@@ -70,6 +70,6 @@ Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontai
 3. 초기 환경 버전과 Java 21·Docker 호환성은 확인했다. 향후 버전 갱신 시 동일 검증을 다시 수행한다.
 4. 배타 제약·예약 행 잠금·제한 재시도를 채택했다. 직접 SQL 무결성·실제 교착·재시도 소진·대기 후 시간 정책을 테스트하고 성능 보장은 별도로 검증한다.
 5. 동시 테스트는 8개 HTTP 요청과 기본 Hikari 최대 10개 연결, 같은 구간 생성 3회 반복으로 시작한다. 부하와 다중 인스턴스 규모의 검증은 후속 과제다.
-6. 초기 환경 검증 명령은 backend-setup.md에 기록했다. 도메인 구현 후 검증 범위를 확장하고 필요에 따라 CI 자동 검증 도입.
+6. 실행·검증 및 CI 절차는 backend-setup.md에 기록했다. 도메인 구현 후 테스트 범위를 확장하고 원격 CI 실행 결과와 필수 상태 검사 설정을 확인한다.
 
 다음 작업은 예약 목록과 필터 계약을 정하고 구현하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
