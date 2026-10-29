@@ -66,7 +66,7 @@ docker compose down
 
 `PostgresIntegrationTest`는 `@ServiceConnection`으로 별도 PostgreSQL 컨테이너의 동적 포트·자격 증명을 주입한다. Compose DB를 먼저 실행할 필요가 없으며 로컬 DB 데이터도 사용하지 않는다. Docker가 없으면 테스트는 실패하며 자동으로 건너뛰지 않는다.
 
-`PostgresIntegrationTest`는 임의 포트의 웹 애플리케이션 기동, 실제 PostgreSQL JDBC 연결 및 `select 1`, 최신 Flyway 버전 2 적용과 미적용 마이그레이션 부재를 확인한다. V1은 `SELECT 1`만 수행하고 V2가 공간 테이블을 추가한다. 향후 스키마는 새 버전 파일로 추가한다. `SpaceApiIntegrationTest`는 별도 PostgreSQL에서 공간 API를 검증한다. 예약·동시성 검증은 아직 포함하지 않는다.
+`PostgresIntegrationTest`는 기본 기동, 실제 PostgreSQL 연결, 최신 Flyway 버전 4 및 기존 데이터 업그레이드를 확인한다. V1은 초기 이력, V2는 공간, V3는 예약, V4는 활성 예약 배타 제약이다. V4는 btree_gist를 public에 설치할 권한이 필요하며 활성 중복 데이터가 있으면 실패한다. 기존 데이터를 자동 수정하지 않는다. 공간 API는 `SpaceApiIntegrationTest`, 예약 API와 동시성·교착 복구는 `ReservationApiIntegrationTest`가 별도 PostgreSQL에서 검증한다. 상세 결과는 [reservation-concurrency.md](reservation-concurrency.md)를 참고한다.
 
 테스트 리포트는 `backend/build/reports/tests/test/index.html`, 실행 JAR는 `backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar`에 생성된다.
 

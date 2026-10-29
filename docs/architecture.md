@@ -2,7 +2,7 @@
 
 ## 상태와 구조
 
-공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces` 테이블로 구현했다. 예약 구조와 데이터 모델은 구현 전 설계 초안이다. V1 초기 마이그레이션은 유지하며, 실행 안내는 [backend-setup.md](backend-setup.md), 공간 API 계약과 검증 결과는 [space-api.md](space-api.md), 기능과 수용 기준은 [requirements.md](requirements.md)를 따른다.
+공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces`, 예약 생성·취소는 `reservation` 패키지와 V3의 `reservations`로 구현했다. V4는 CONFIRMED 한정 배타 제약을 추가하며 V1~V3는 보존한다. 실행 안내는 [backend-setup.md](backend-setup.md), API 계약은 [space-api.md](space-api.md) 및 [reservation-api.md](reservation-api.md), 최신 동시성 설계·검증은 [reservation-concurrency.md](reservation-concurrency.md), 수용 기준은 [requirements.md](requirements.md)를 따른다. 예약 목록 AC10은 미구현·미검증이다.
 
 단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 현재 `backend/`, `docs/`와 루트 `compose.yaml`로 구성한다. `frontend/`는 추후 React·TypeScript·Vite로 개발한다.
 
@@ -21,7 +21,7 @@
 
 엔티티를 API 응답으로 직접 노출하지 않는다. 입력 형식 검증과 비즈니스 규칙 검증을 구분하고, 시간 판단은 주입 가능한 Clock을 사용한다.
 
-## 데이터 모델 초안
+## 데이터 모델
 
 | 테이블 | 주요 필드 | 제약·의미 |
 | --- | --- | --- |
@@ -29,23 +29,25 @@
 | reservations | id, space_id, booker_name, start_at, end_at, status, created_at, cancelled_at | PK, 공간 FK, 필수값 NOT NULL, start_at < end_at, 상태 제한 |
 
 - 공간 1개에 예약 여러 개가 연결된다. 예약을 물리 삭제하지 않는다.
-- 공간 ID는 DB 생성 BIGINT IDENTITY를 채택했다. 예약 ID는 BIGINT를 제안하며 예약 구현 전 확정한다.
+- 공간과 예약 ID는 DB 생성 BIGINT IDENTITY를 채택했다.
 - 시각은 PostgreSQL `timestamptz`, Java에서는 `Instant` 중심으로 취급한다. 원래 입력의 시간대 이름을 보존하는 요구는 없다.
 - `CONFIRMED`이면 cancelled_at은 NULL, `CANCELLED`이면 취소 시각을 기록한다. 기본 무결성은 DB 제약과 애플리케이션에서 함께 보장한다.
-- 조회·중복 확인용 `(space_id, status, start_at)` 인덱스를 후보로 두고 실제 쿼리와 실행 계획으로 확정한다. 인덱스 자체는 중복 예약을 막지 않는다.
-- 공간 이름은 VARCHAR(100), 설명은 선택 VARCHAR(2000), 목록은 ID 오름차순에 기본 20개·최대 100개 페이지를 적용했다. 예약 문자열 길이와 페이지 크기 및 최대 조회 구간은 예약 API 계약과 함께 정한다.
+- V3의 `(space_id, status, start_at)` B-tree 인덱스는 보존한다. V4는 공간 동등성·tstzrange `[)` 겹침을 결합한 GiST 배타 제약을 CONFIRMED에만 적용한다. 중복 무결성의 최종 보장은 이 제약이며 실행 계획·부하 튜닝은 후속 과제다.
+- 공간 이름은 VARCHAR(100), 설명은 선택 VARCHAR(2000), 목록은 ID 오름차순에 기본 20개·최대 100개 페이지를 적용했다. 예약자명은 VARCHAR(100)이다. 예약 목록의 페이지 크기와 최대 조회 구간은 미결정이다.
 
-## 동시성 및 트랜잭션 제안
+## 동시성 및 트랜잭션 결정
 
-구현 후보 중 하나는 PostgreSQL READ COMMITTED에서 **공간 행에 대한 비관적 쓰기 잠금**을 사용하는 방식이며, 확정된 방식은 아니다. 아래는 이 후보를 채택할 경우의 흐름이다. 예약 생성은 하나의 트랜잭션에서 공간 잠금 획득 → Clock으로 미래 여부 검증 → 확정 예약 중복 조회 → 저장 → 커밋 순서로 수행한다. 대기 중 시작 시각이 지나면 생성하지 않는다.
+현재 구현은 **PostgreSQL 배타 제약으로 중복을 보장하고 취소는 예약 ID 행만 잠근다.** 공간 행 쓰기 잠금과 사전 중복 조회는 제거했다. 생성은 명명된 제약에 대한 INSERT ON CONFLICT DO NOTHING RETURNING을 사용한다. 반환 행이 없으면 중복 409이며 다른 제약 위반을 삼키지 않는다. 실행 전후 Clock으로 미래 시작을 검사해 대기 중 시각이 지나면 롤백한다.
 
-같은 공간의 생성 요청은 같은 공간 행을 먼저 잠그므로, 기존 예약이 없는 경우에도 직렬화된다. 예약 행만 잠그거나 중복 SELECT 후 INSERT만 수행하는 방식은 빈 구간 경쟁을 막지 못한다. 잠금 후 별도 조회에서 먼저 커밋된 예약을 읽는 동작을 실제 PostgreSQL 통합 테스트로 확인한다.
+단순 INSERT와 3회 교착 재시도만 적용한 중간 구현에서는 기존 8동시 테스트에서 503이 발생했다. PostgreSQL의 speculative insertion 복구 경로를 쓰는 DO NOTHING을 선택했으며 재시도 횟수 증가로 문제를 감추지 않았다. 생성 SQL은 JdbcTemplate이 동일 DataSource의 JpaTransactionManager 트랜잭션에 참여하여 실행한다. 취소는 JPA의 PESSIMISTIC_WRITE로 예약 행을 읽고 잠금 이후의 상태·Clock으로 변경한다.
 
-취소 역시 공간 → 예약 순서로 잠그고 상태를 다시 확인한다. 공간 ID 확인용 조회가 필요하면 잠금 후 예약을 다시 읽는다. 모든 변경 경로가 같은 순서를 따라야 하며 잠금은 커밋·롤백까지 유지한다. 외부 호출을 트랜잭션에 포함하지 않는다.
+외부 ReservationService는 NOT_SUPPORTED로 실패한 트랜잭션 밖에서 오류를 분류한다. 별도 ReservationTransactions 빈의 각 생성·취소 시도는 REQUIRES_NEW·READ COMMITTED다. 재시도 시 새 영속성 컨텍스트와 트랜잭션을 사용하고 실패한 시도의 쓰기를 롤백한다. self-invocation으로 트랜잭션 프록시를 우회하지 않는다.
 
-대안으로 PostgreSQL 범위 타입과 배타 제약을 사용할 수 있다. DB가 중복을 직접 차단하지만 확장·마이그레이션과 오류 매핑이 필요하다. 공간 잠금 후보는 이해와 검증이 간단하지만 같은 공간의 겹치지 않는 예약도 직렬화하고, 프로토콜을 우회한 직접 DB 쓰기는 막지 못한다. 실제 구현 시 대안의 복잡도와 무결성 보장 범위를 비교하고, PostgreSQL 통합·동시성 테스트 결과를 근거로 동시성 제어 방식을 결정한다.
+PostgreSQL이 고정되어 있고 시간 구간 무결성이 핵심이므로 DB 전용 배타 제약을 채택했다. 공간 잠금은 구현이 간단하지만 무관한 구간도 직렬화하며 직접 SQL을 강제하지 못한다. SERIALIZABLE은 별도의 직렬화 실패 정책이 필요하다. 비교·실패 근거와 전환 순서는 [reservation-concurrency.md](reservation-concurrency.md)에 기록한다. 이번에는 고부하 벤치마크를 실행하지 않는다.
 
-중복은 409로 변환한다. 잠금 시간 초과·교착 상태를 중복으로 단정하지 않는다. 해당 오류의 응답 정책은 미결정이며 무제한 재시도는 추가하지 않는다.
+해당 이름의 예약 배타 제약에서 발생한 23P01만 중복 409로 변환한다. 40P01만 최초 포함 최대 3회, 10~30ms jitter 후 새 트랜잭션에서 재시도한다. 소진·인터럽트·다른 일시적 시간 초과는 503이다. 각 시도의 제한은 15초이며 전체 HTTP 요청의 전역 제한은 아니다. 전체 요청 마감·성능 조정은 별도 후속 과제다.
+
+V4는 테이블의 쓰기를 막은 상태에서 기존 활성 중복을 점검하고 제약을 설치한다. 중복이 있으면 실패하며 데이터를 자동 삭제·취소하지 않는다. btree_gist를 public에 설치할 권한과 마이그레이션 잠금에 따른 운영 절차가 필요하다.
 
 ## 기술 선택 이유와 검증 방향
 
@@ -59,15 +61,15 @@
 
 단위 테스트는 시간 경계·겹침·상태 전이를 확인한다. 통합 테스트는 마이그레이션, DB 제약, API 오류 계약, 롤백을 검증한다. 동시성 테스트는 독립 트랜잭션과 충분한 DB 연결을 확보하고 제한 시간 내 완료 여부와 최종 데이터를 확인한다. 테스트 격리를 통해 서로의 예약 데이터에 영향을 주지 않도록 한다.
 
-Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API는 실제 HTTP·PostgreSQL 통합 테스트로 검증하며 결과는 [space-api.md](space-api.md)에 기록한다. 초기 환경 검증 결과와 CI 실행 절차는 [backend-setup.md](backend-setup.md)에 기록한다. GitHub Actions는 PR 생성·업데이트 및 main push에서 Java 21·Wrapper로 전체 빌드와 PostgreSQL 테스트를 실행하도록 구성했다. Docker 연결 실패는 CI 실패로 처리한다. 원격 워크플로 실행은 아직 검증하지 않았으며, 이 main 기준 브랜치에는 예약·동시성 테스트가 포함되지 않는다.
+Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API 결과는 [space-api.md](space-api.md), 예약 생성·취소와 동시성 설계·검증 결과는 [reservation-api.md](reservation-api.md)와 [reservation-concurrency.md](reservation-concurrency.md)에 기록한다. 초기 환경 검증 결과와 CI 실행 절차는 [backend-setup.md](backend-setup.md)에 기록한다. GitHub Actions는 PR 생성·업데이트 및 main push에서 Java 21·Wrapper로 전체 빌드와 PostgreSQL 테스트를 실행하도록 구성했다. Docker 연결 실패는 CI 실패로 처리한다. 현재 예약 API 브랜치에는 예약 생성·취소, 동시성 및 교착 복구 테스트가 포함되며 동일한 CI 빌드 명령의 실행 대상이다. 이 통합 상태의 원격 CI 실행 결과는 아직 확인하지 않았다.
 
 ## 구현 전에 확인할 미결정 사항
 
-1. 제안한 취소 정책(확정 예약은 시작 전만 취소 가능, 취소 예약은 시작 시각 경과 여부와 관계없이 재취소 200), 미래 예약 및 시간 정밀도 정책 확인.
-2. 공간 API 계약은 space-api.md에 정리했다. 예약 REST URL, 요청·응답·오류 스키마, 문자열 제한, 페이지 방식 및 필터 기본값은 미결정이다.
+1. 시작 전 최초 취소, 시각과 무관한 재취소 성공, 미래 예약·마이크로초 정밀도는 구현 계약으로 채택했다. 인증·소유자 권한은 후속 과제다.
+2. 공간과 예약 생성·취소 API 계약은 각 문서에 정리했다. 예약 목록·페이지·필터 계약은 미결정이다.
 3. 초기 환경 버전과 Java 21·Docker 호환성은 확인했다. 향후 버전 갱신 시 동일 검증을 다시 수행한다.
-4. 실제 도메인 구현 시 비관적 잠금과 대안을 비교하고 통합·동시성 테스트로 동시성 제어 방식 결정. 잠금 후보 검증 시 잠금 SQL, 격리 수준, 대기 제한 및 오류 매핑 확인.
-5. 동시성 테스트 반복 횟수·병렬 수·연결 풀 크기와 재현 방법 결정.
+4. 배타 제약·예약 행 잠금·제한 재시도를 채택했다. 직접 SQL 무결성·실제 교착·재시도 소진·대기 후 시간 정책을 테스트하고 성능 보장은 별도로 검증한다.
+5. 동시 테스트는 8개 HTTP 요청과 기본 Hikari 최대 10개 연결, 같은 구간 생성 3회 반복으로 시작한다. 부하와 다중 인스턴스 규모의 검증은 후속 과제다.
 6. 실행·검증 및 CI 절차는 backend-setup.md에 기록했다. 도메인 구현 후 테스트 범위를 확장하고 원격 CI 실행 결과와 필수 상태 검사 설정을 확인한다.
 
-다음 작업은 위 미결정 정책을 확인한 후 예약 기능과 동시성 제어를 구성하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
+다음 작업은 예약 목록과 필터 계약을 정하고 구현하는 것이다. Custom Skill, Subagent, 자동 Loop는 필요성이 확인되면 단계적으로 추가하며, GSD 등의 Framework는 도입하지 않는다.
