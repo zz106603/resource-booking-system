@@ -95,6 +95,41 @@ Ubuntu 24.04 러너에서 Temurin Java 21과 저장소의 Gradle Wrapper를 사�
 - GitHub Actions 실제 이벤트 실행과 Ubuntu에서의 `./gradlew` 실행은 미검증이다. Linux Wrapper의 Git 모드 `100755`는 확인했다. Docker 미설치 환경의 실패 재현은 별도로 실행하지 않았으며, 사전 확인과 테스트 설정에서 실패를 무시하지 않는 것을 점검했다.
 - 커밋·push·PR 생성은 수행하지 않았다. 실제 원격 실행 결과와 필수 상태 검사 지정은 후속 확인 항목이다.
 
+## Trivy 실행 JAR 취약점 검사
+
+기존 `build-and-test`의 Docker 확인·Java 21·Wrapper·전체 테스트·테스트 리포트는 유지한다. 빌드 성공 후 실행 JAR `backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar`만 `backend-executable-jar`로 1일 보관하고, `needs: build-and-test`인 별도 `backend-security` Job이 같은 실행의 아티팩트를 내려받아 검사한다. `*-plain.jar`는 의존성이 없어 대상에서 제외한다. 실행 JAR은 `BOOT-INF/classes/`와 `BOOT-INF/lib/`의 런타임 라이브러리를 포함한다.
+
+Trivy v0.76.1 공식 이미지의 OCI index digest를 `ghcr.io/aquasecurity/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c`로 고정했다. 도입 시 Cosign의 GitHub OIDC 발행 주체·서명·투명성 로그 검증을 성공했다. 이후 매 실행에서 태그를 다시 해석하거나 설치 스크립트를 다운로드하지 않는다. 이미지 갱신 시 공식 릴리스·보안 권고·서명을 확인한 뒤 digest와 검증 기록을 함께 갱신한다. digest·서명은 무해함을 단독 보장하지 않는다.
+
+2026년 3월의 Trivy 바이너리·Action 태그·설치 Action 공급망 사고를 고려해 `trivy-action`과 동적 설치 경로는 사용하지 않는다. 새로 추가하는 아티팩트 업로드·다운로드, 체크아웃, SARIF 업로드 Action은 검토한 릴리스의 전체 커밋 SHA로 고정한다. 기존 빌드 Job의 Action 버전은 이번 범위에서 변경하지 않는다.
+
+**JAR은 `fs`가 아닌 `rootfs` 모드로 분석한다.** v0.76.1의 fs 모드는 JAR 분석기를 비활성화하므로 파일을 입력해도 Java 패키지를 찾지 못한다. `rootfs --scanners vuln --pkg-types library`로 실행 JAR과 내부 JAR의 알려진 라이브러리 취약점만 분석한다. HIGH·CRITICAL만 보고하며 수정 버전이 없는 취약점도 숨기지 않는다. 테스트 전용 의존성·실행 JDK·OS·PostgreSQL 이미지·애플리케이션 로직 검사는 포함하지 않는다.
+
+검사는 컨테이너에 JAR 디렉터리만 읽기 전용으로 연결하고, 결과 디렉터리만 쓰기 허용한다. 호스트 Docker 소켓·GitHub 토큰·자격 증명·저장소 전체를 컨테이너에 전달하지 않는다. capability는 모두 제거하고 no-new-privileges를 적용한다. DB는 매 실행 최신 정보로 내려받으며 이번에는 실행 간 DB 캐시를 구성하지 않는다. 스캔 제한은 10분, 보안 Job 제한은 15분이다.
+
+스캐너는 JSON과 패키지 정보를 먼저 생성한다. Python 표준 라이브러리로 Java 패키지 식별 여부와 심각도를 확인한 뒤, 같은 Trivy 이미지의 `convert`로 SARIF 2.1.0을 생성·점검한다. 취약점이 0건이어도 유효한 결과지만 패키지 미식별·잘못된 JSON/SARIF는 실패다. JSON·SARIF 결과는 성공·실패 시 `backend-security-reports`로 7일 보관하며 보관 파일 자체가 검사 성공을 의미하지 않는다.
+
+`--exit-code 0`은 취약점 발견만으로 실패시키지 않는 정책이다. JAR 누락·아티팩트 전달 실패·스캐너/DB/변환 실행 오류·결과 검증 오류·Code Scanning 업로드 오류는 무시하지 않는다. `continue-on-error`나 `|| true`는 사용하지 않는다. 선행 빌드 실패 시 보안 Job이 생략되는 것은 정상 검사 완료가 아니다.
+
+SARIF는 `github/codeql-action/upload-sarif`로 category `trivy-backend-jar`, `wait-for-processing: true`로 업로드한다. 기존 빌드는 `contents: read`를 유지하고 보안 Job에만 `contents: read`, `security-events: write`를 준다. 현재 공개 저장소 기준으로 PAT·issues/pull-requests 쓰기 권한은 필요 없다. Code Scanning에서 실행 JAR 경로로 보고되며 Java 소스 줄 단위 분석 결과는 아니다. 취약점 발견을 차단 조건으로 하는 별도 저장소 규칙이 있다면 초기 보고 전용 정책과 함께 검토해야 한다. GitHub Issue 자동 생성·AI 자동 수정은 구성하지 않는다.
+
+공식 근거: [Java 지원](https://trivy.dev/docs/latest/coverage/language/java/), [지원 모드](https://trivy.dev/docs/latest/coverage/language/), [v0.76.1 분석기 선택 코드](https://github.com/aquasecurity/trivy/blob/v0.76.1/pkg/commands/artifact/run.go), [공급망 사고 권고](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23), [서명 검증](https://trivy.dev/docs/latest/getting-started/signature-verification/), [SARIF 업로드·권한](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/integrate-with-existing-tools/upload-sarif-file).
+
+### Trivy 도입 검증 기록 (2026-10-29)
+
+- `backend/`에서 `.\gradlew.bat clean build --no-daemon`: BUILD SUCCESSFUL, 1분 32초. 전체 155개(실제 PostgreSQL 143·단위 12), 실패·오류·건너뜀 0. 실행 JAR 생성, 기존 동시성·교착 복구 테스트 유지.
+- 공식 Trivy 0.76.1 이미지 digest와 소스 revision e713f67 확인. 공식 Cosign v3.0.2 Windows 바이너리는 GitHub 릴리스 SHA256 `7a137280d8686665ceb4d8565df2a0ac63f28031e014cdcae5d56891a6c8a400`와 대조 후 사용했다. 위 Trivy digest의 서명·발행 주체·투명성 로그 검증 종료 코드 0. 별도 digest 고정 Cosign 컨테이너 경로에서도 검증 성공.
+- 최초 `fs` 실험은 종료 코드 0이었지만 `num=0`, Results·패키지 정보 부재였다. 공식 분석기 선택 코드에서 fs가 JAR을 제외함을 확인해 rootfs로 수정했다. 이를 취약점 없음이나 검사 성공으로 기록하지 않는다.
+- DB가 없는 임시 컨테이너에서 `--skip-db-update --exit-code 0` 실행은 종료 코드 1로 실패했다. 취약점 발견용 종료 정책이 실행 오류를 삼키지 않는 것을 확인했다.
+- 워크플로의 Python 검증 코드를 직접 추출해 Java 패키지 미식별·잘못된 SARIF는 실패하고, HIGH 취약점이 있는 패키지 결과·취약점 0건의 유효한 SARIF는 통과하는 것을 확인했다.
+- 수정한 고정 이미지의 `rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit-code 0 --timeout 10m --no-progress --format json --list-all-pkgs`로 새 실행 JAR을 검사했다. 로컬에서만 반복 검증용 DB 캐시를 `backend/build/trivy-cache/`에 연결했다. 최초 DB 다운로드 포함 약 6분 22초, 종료 코드 0. 런타임 라이브러리 61개를 식별하고 HIGH 6·CRITICAL 6, 고유 CVE 12개를 보고했다. 취약점 발견과 검사 실행 성공은 구분하며 의존성 수정·오탐/영향도 판정은 이번 변경에 포함하지 않았다.
+- 같은 이미지의 `convert --format sarif --severity HIGH,CRITICAL`로 실제 SARIF 12건을 생성했고 워크플로에서 추출한 JSON·SARIF 검증 코드가 모두 통과했다. 결과 경로는 실행 JAR/BOOT-INF/lib 아래의 상대 가상 경로이며 ROOTPATH는 `file:///reports/trivy.json/`다. 실제 GitHub 표시·경로 처리는 원격 확인 항목이다.
+- Trivy가 취약점 없는 입력을 변환한 실제 SARIF의 `results: []`도 검증을 통과했다. 잘못된 JSON의 convert는 종료 코드 1. 네트워크 없는 rootfs 컨테이너의 DB 다운로드와 누락 JAR의 `test -s` 사전 조건도 각각 종료 코드 1이었다.
+- `docker run --rm -v "${PWD}:/repo:ro" -w /repo rhysd/actionlint:1.7.7 -color .github/workflows/backend-ci.yml`: 최종 워크플로 검사 통과. 로컬 Python에 PyYAML이 없어 보조 파싱은 실행하지 못했으며 대신 actionlint를 사용했다. 실제 Trivy 스캔·결과 검증은 별도로 실행했다.
+- `requesting-code-review` Skill의 독립 리뷰어 Subagent가 기준 origin/main·HEAD `2841904`와 두 파일의 미커밋 변경을 검토했다. Critical·Important·Minor 지적 없음. 실제 패키지·SARIF·빈 결과 형식도 추가 확인 후 수용 가능 판정을 유지했다. 리뷰어가 빌드·스캐너를 재실행한 것은 아니다.
+- 원격 PR/main 이벤트·아티팩트 전달·SARIF 실제 업로드/처리·권한 거부·Fork/Dependabot PR은 로컬 검증으로 대체할 수 없으며, push 전이므로 아직 실행하지 않았다.
+- 로컬 보고서는 무시되는 `backend/build/trivy-reports/trivy.json`, `trivy.sarif`에 있다. 재현할 때는 워크플로의 스캔·검증·변환 명령을 기준으로 입력/출력 마운트 경로를 로컬 환경에 맞춘다. DB·보고서는 build 아래의 검증 산출물이며 저장소에 포함하지 않는다. JDK/OS/PostgreSQL 이미지·테스트 의존성은 후속 검사 범위이고, 발견된 12개 CVE의 영향도·수정 버전 검토 및 원격 CI 확인이 다음 작업이다.
+
 ## 실제 검증 결과 (2026-10-27)
 
 | 검증 | 결과 |
