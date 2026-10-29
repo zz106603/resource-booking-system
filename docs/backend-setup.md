@@ -70,6 +70,8 @@ docker compose down
 
 테스트 리포트는 `backend/build/reports/tests/test/index.html`, 실행 JAR는 `backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar`에 생성된다.
 
+예약 목록은 `ReservationListIntegrationTest`가 독립 PostgreSQL·HTTP로 검증한다. 계약과 실제 결과는 [reservation-list.md](reservation-list.md)를 따른다. 목록 테스트만 실행하려면 `backend/`에서 `.\gradlew.bat test --tests '*ReservationListIntegrationTest' --no-daemon`을 사용한다. 전체 `clean build`와 CI 기본 명령에도 해당 테스트가 포함된다.
+
 ## GitHub Actions CI
 
 [Backend CI](../.github/workflows/backend-ci.yml)는 PR 생성·커밋 업데이트·재오픈·리뷰 준비 전환과 `main` push에서 실행한다. 초안 PR도 실행하며 경로 필터 없이 해당 리비전의 전체 백엔드 테스트를 검증한다.
