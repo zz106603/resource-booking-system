@@ -105,7 +105,7 @@ Trivy v0.76.1 공식 이미지의 OCI index digest를 `ghcr.io/aquasecurity/triv
 
 **JAR은 `fs`가 아닌 `rootfs` 모드로 분석한다.** v0.76.1의 fs 모드는 JAR 분석기를 비활성화하므로 파일을 입력해도 Java 패키지를 찾지 못한다. `rootfs --scanners vuln --pkg-types library`로 실행 JAR과 내부 JAR의 알려진 라이브러리 취약점만 분석한다. HIGH·CRITICAL만 보고하며 수정 버전이 없는 취약점도 숨기지 않는다. 테스트 전용 의존성·실행 JDK·OS·PostgreSQL 이미지·애플리케이션 로직 검사는 포함하지 않는다.
 
-검사는 컨테이너에 JAR 디렉터리만 읽기 전용으로 연결하고, 결과 디렉터리만 쓰기 허용한다. 호스트 Docker 소켓·GitHub 토큰·자격 증명·저장소 전체를 컨테이너에 전달하지 않는다. capability는 모두 제거하고 no-new-privileges를 적용한다. DB는 매 실행 최신 정보로 내려받으며 이번에는 실행 간 DB 캐시를 구성하지 않는다. 스캔 제한은 10분, 보안 Job 제한은 15분이다.
+검사는 컨테이너에 JAR 디렉터리만 읽기 전용으로 연결하고, 결과 디렉터리만 쓰기 허용한다. 스캔·변환 컨테이너 모두 `--user "$(id -u):$(id -g)" --env HOME=/tmp`로 러너와 같은 UID/GID를 사용한다. 러너 소유 출력 폴더에 쓰고 임시 HOME에 캐시를 생성할 수 있게 하면서 root 권한에 의존하지 않는다. 호스트 Docker 소켓·GitHub 토큰·자격 증명·저장소 전체를 컨테이너에 전달하지 않는다. capability는 모두 제거하고 no-new-privileges를 적용한다. DB는 매 실행 최신 정보로 내려받으며 이번에는 실행 간 DB 캐시를 구성하지 않는다. 스캔 제한은 10분, 보안 Job 제한은 15분이다.
 
 스캐너는 JSON과 패키지 정보를 먼저 생성한다. Python 표준 라이브러리로 Java 패키지 식별 여부와 심각도를 확인한 뒤, 같은 Trivy 이미지의 `convert`로 SARIF 2.1.0을 생성·점검한다. 취약점이 0건이어도 유효한 결과지만 패키지 미식별·잘못된 JSON/SARIF는 실패다. JSON·SARIF 결과는 성공·실패 시 `backend-security-reports`로 7일 보관하며 보관 파일 자체가 검사 성공을 의미하지 않는다.
 
@@ -129,6 +129,15 @@ SARIF는 `github/codeql-action/upload-sarif`로 category `trivy-backend-jar`, `w
 - `requesting-code-review` Skill의 독립 리뷰어 Subagent가 기준 origin/main·HEAD `2841904`와 두 파일의 미커밋 변경을 검토했다. Critical·Important·Minor 지적 없음. 실제 패키지·SARIF·빈 결과 형식도 추가 확인 후 수용 가능 판정을 유지했다. 리뷰어가 빌드·스캐너를 재실행한 것은 아니다.
 - 원격 PR/main 이벤트·아티팩트 전달·SARIF 실제 업로드/처리·권한 거부·Fork/Dependabot PR은 로컬 검증으로 대체할 수 없으며, push 전이므로 아직 실행하지 않았다.
 - 로컬 보고서는 무시되는 `backend/build/trivy-reports/trivy.json`, `trivy.sarif`에 있다. 재현할 때는 워크플로의 스캔·검증·변환 명령을 기준으로 입력/출력 마운트 경로를 로컬 환경에 맞춘다. DB·보고서는 build 아래의 검증 산출물이며 저장소에 포함하지 않는다. JDK/OS/PostgreSQL 이미지·테스트 의존성은 후속 검사 범위이고, 발견된 12개 CVE의 영향도·수정 버전 검토 및 원격 CI 확인이 다음 작업이다.
+
+### Linux 출력 폴더 권한 수정 (2026-10-29)
+
+- PR #7의 [Backend CI run 40829677088](https://github.com/zz106603/resource-booking-system/actions/runs/40829677088)에서 빌드·전체 테스트·실행 JAR 업로드/다운로드는 성공했다. 보안 Job 123301204463은 DB 다운로드와 JAR 분석 후 `open /reports/trivy.json: permission denied`로 종료 코드 1이었다. SARIF 업로드는 생략됐다.
+- 기본 root 실행이라도 `--cap-drop ALL`이면 다른 UID가 소유한 0755 폴더의 쓰기 권한을 우회할 수 없다. Windows bind mount 검증에서는 이 POSIX 소유권 차이를 재현하지 못했다. 임시 Linux 볼륨에 UID/GID 1001:1001·0755 폴더를 구성하고 기존 root/cap-drop Trivy convert에서 같은 permission denied·종료 코드 1을 재현했다.
+- 스캔·변환을 모두 러너 UID/GID로 실행하도록 수정하고 HOME은 /tmp로 지정했다. chmod 777·capability 복구·오류 무시는 사용하지 않는다. 같은 Linux 볼륨에서 실제 JAR 스캔과 SARIF 변환이 종료 코드 0, 출력 JSON/SARIF 소유권 1001:1001·0644로 성공했다. 비root 임시 HOME의 캐시 폴더 생성·쓰기도 확인했다. 로컬 재검증에서 DB는 기존 캐시를 재사용했으며 CI의 DB 갱신 정책은 유지한다.
+- actionlint와 `git diff --check`를 통과했다. 애플리케이션·의존성·테스트 코드는 변경하지 않아 전체 빌드·테스트는 재실행하지 않았다. 수정 전 원격 빌드·테스트 성공과 수정 후 로컬 보안 실행 검증을 구분한다.
+- 수정 후 생성된 JSON의 패키지 61개와 SARIF 12건을 워크플로의 실제 Python 검증 코드로 확인했다. 독립 리뷰어 Subagent가 HEAD `201f01b` 대비 권한 수정 두 파일만 재검토했으며 Critical·Important·Minor 지적 없이 수용 가능 판정을 내렸다. 기존 PR 전체를 중복 리뷰하지 않았고 리뷰어가 재현 실험을 재실행한 것은 아니다.
+- 수정 후 원격 CI 재실행 및 SARIF 실제 업로드·처리·권한 확인은 미검증이다. 이 수정은 커밋·push하지 않은 상태로 검증했다.
 
 ## 실제 검증 결과 (2026-10-27)
 

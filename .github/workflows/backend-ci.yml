@@ -89,7 +89,9 @@ jobs:
           set -euo pipefail
           test -s backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar
           mkdir -p "$REPORT_DIR"
-          docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+          # Match the runner-owned bind mount without restoring root capabilities.
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
             --mount "type=bind,src=$PWD/backend/build/libs,dst=/artifacts,readonly" \
             --mount "type=bind,src=$REPORT_DIR,dst=/reports" \
             "$TRIVY_IMAGE" rootfs --scanners vuln --pkg-types library \
@@ -106,7 +108,8 @@ jobs:
           if any(v["Severity"] not in {"HIGH", "CRITICAL"} for r in results for v in r.get("Vulnerabilities", [])):
               raise SystemExit("Unexpected vulnerability severity")
           PY
-          docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+          docker run --rm --user "$(id -u):$(id -g)" --env HOME=/tmp \
+            --cap-drop ALL --security-opt no-new-privileges \
             --mount "type=bind,src=$REPORT_DIR,dst=/reports" \
             "$TRIVY_IMAGE" convert --format sarif --severity HIGH,CRITICAL \
             --output /reports/trivy.sarif /reports/trivy.json
