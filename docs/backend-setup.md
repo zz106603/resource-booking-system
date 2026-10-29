@@ -16,7 +16,9 @@
 - Spring Boot 3.5.16: JUnit 5 기반 기존 요구사항에 맞는 안정 3.5 계열. 최신 주 버전이라는 의미는 아니다.
 - Gradle 8.14.3: Java 21 및 Boot 3.5 호환 범위의 Wrapper 사용.
 - PostgreSQL 17.11 Alpine: 로컬 개발과 통합 테스트에서 같은 이미지 태그 사용.
-- JPA·Flyway·PostgreSQL JDBC·JUnit·Testcontainers: Boot BOM으로 호환 버전을 함께 관리한다. 실제 해석 결과는 Flyway 11.7.2, PostgreSQL JDBC 42.7.11, JUnit Jupiter 5.12.2, Testcontainers 1.21.4다.
+- JPA·Flyway·PostgreSQL JDBC·JUnit·Testcontainers: Boot BOM을 기본 호환 기준으로 관리한다. 초기 실제 해석 결과는 Flyway 11.7.2, PostgreSQL JDBC 42.7.11, JUnit Jupiter 5.12.2, Testcontainers 1.21.4다. 이후 보안 패치는 아래 현재 선택과 구분한다.
+
+현재 런타임 보안 패치는 Boot 3.5.16 BOM을 유지하면서 Jackson BOM 2.21.8, Tomcat embed 10.1.61(core/el/websocket), PostgreSQL JDBC 42.7.14를 명시한다. 기본 BOM과 다른 패치를 적용한 근거·실제 호환성 검증·잔여 Spring 취약점 및 메이저 전환 판단은 [dependency-security-updates.md](dependency-security-updates.md)에 기록한다. Framework 7을 Boot 3에 단독 주입하지 않는다.
 
 공식 근거: [Boot 시스템 요구사항](https://docs.spring.io/spring-boot/3.5/system-requirements.html), [Boot 의존성 관리](https://docs.spring.io/spring-boot/3.5/appendix/dependency-versions/coordinates.html), [PostgreSQL 지원 버전](https://www.postgresql.org/support/versioning/).
 
