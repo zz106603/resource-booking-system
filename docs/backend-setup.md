@@ -70,6 +70,29 @@ docker compose down
 
 테스트 리포트는 `backend/build/reports/tests/test/index.html`, 실행 JAR는 `backend/build/libs/resource-booking-system-backend-0.0.1-SNAPSHOT.jar`에 생성된다.
 
+## GitHub Actions CI
+
+[Backend CI](../.github/workflows/backend-ci.yml)는 PR 생성·커밋 업데이트·재오픈·리뷰 준비 전환과 `main` push에서 실행한다. 초안 PR도 실행하며 경로 필터 없이 해당 리비전의 전체 백엔드 테스트를 검증한다.
+
+Ubuntu 24.04 러너에서 Temurin Java 21과 저장소의 Gradle Wrapper를 사용한다. `setup-gradle`로 Wrapper 검증과 Gradle 캐시를 구성하며, 테스트 결과를 캐시하거나 테스트를 제외하지 않는다. 체크아웃 토큰 권한은 `contents: read`로 제한한다.
+
+`backend/`에서 `docker info`가 성공한 다음 `./gradlew clean build --no-daemon`을 실행한다. Docker 연결 실패 시 작업이 실패하며 `continue-on-error`로 무시하지 않는다. 기존 `@Testcontainers`에도 Docker 부재 시 건너뛰는 설정이 없다. PostgreSQL 17.11 Alpine은 테스트가 직접 생성하므로 Compose나 Actions PostgreSQL 서비스는 필요 없다.
+
+작업 제한 시간은 20분이다. 성공·실패 시 생성된 HTML/JUnit XML 리포트를 `backend-test-reports` 아티팩트로 7일 보존한다. 빌드 시작 전 실패하여 리포트가 없으면 업로드는 경고만 남기며, 앞 단계의 실패 결과는 유지한다.
+
+구성 근거: [Java 설정](https://github.com/actions/setup-java), [Gradle 설정과 Wrapper 검증](https://github.com/gradle/actions/blob/main/docs/setup-gradle.md), [Testcontainers 실행 환경](https://java.testcontainers.org/supported_docker_environment/).
+
+### CI 구성 시 로컬 검증 (2026-10-29)
+
+- 기준: `origin/main`의 `1c86ef7`에서 생성한 `chore/backend-ci`. 예약 API PR #4는 확인 당시 미병합이므로 이 브랜치에 포함되지 않는다. 향후 예약 변경이 병합되면 같은 `build` 명령이 추가 테스트도 실행한다.
+- Java 21.0.7, Docker 엔진 29.9.2 연결 확인.
+- `backend/`에서 `.\gradlew.bat clean build --no-daemon`: 49초, BUILD SUCCESSFUL. PostgreSQL 통합 테스트 47개(환경·마이그레이션 2개, 공간 API 45개), 실패·오류·건너뜀 0.
+- 루트에서 `docker run --rm -v "${PWD}:/repo:ro" -w /repo rhysd/actionlint:1.7.7 -color .github/workflows/backend-ci.yml`: 종료 코드 0, 지적 없음.
+- `git diff --check`: 통과.
+- 최초 제한 환경에서는 Git fetch와 Docker 소켓 접근이 권한 오류로 차단되었다. 허용된 실행으로 fetch와 Docker 연결 및 전체 빌드가 성공했다. 애플리케이션 코드나 설정을 변경해 우회하지 않았다.
+- GitHub Actions 실제 이벤트 실행과 Ubuntu에서의 `./gradlew` 실행은 미검증이다. Linux Wrapper의 Git 모드 `100755`는 확인했다. Docker 미설치 환경의 실패 재현은 별도로 실행하지 않았으며, 사전 확인과 테스트 설정에서 실패를 무시하지 않는 것을 점검했다.
+- 커밋·push·PR 생성은 수행하지 않았다. 실제 원격 실행 결과와 필수 상태 검사 지정은 후속 확인 항목이다.
+
 ## 실제 검증 결과 (2026-10-27)
 
 | 검증 | 결과 |
