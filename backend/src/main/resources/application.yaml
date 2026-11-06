@@ -14,3 +14,11 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+springdoc:
+  paths-to-match: /api/**
+  cache:
+    disabled: true
+  override-with-generic-response: false
+  swagger-ui:
+    disable-swagger-default-url: true

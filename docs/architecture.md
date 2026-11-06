@@ -10,6 +10,8 @@
 
 ## 주요 책임
 
+API 탐색·수동 실행은 springdoc-openapi 2.10.0의 Swagger UI로 제공한다. `common/OpenApiConfiguration`은 기존 컨트롤러에서 생성된 문서에 설명·오류 스키마·예시를 추가한다. 문서 캐시를 끄고 Clock으로 미래 예약 예시를 생성하며 도메인 서비스·DB 제약은 변경하지 않는다. 경로·사용법·문서 노출 설정은 [swagger.md](swagger.md)를 따른다.
+
 | 영역 | 책임 |
 | --- | --- |
 | API | 요청·응답 DTO, 형식·필수값 검증, HTTP 상태 및 공통 오류 변환 |

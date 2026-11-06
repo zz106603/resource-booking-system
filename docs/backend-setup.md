@@ -54,6 +54,8 @@ docker compose down
 
 ## 빌드와 통합 테스트
 
+Swagger UI는 애플리케이션 실행 후 <http://localhost:8080/swagger-ui/index.html>에서 접속한다. 예시 요청 실행 순서, 실제 ID 입력과 미래 예약 시각의 갱신 방식은 [swagger.md](swagger.md)를 따른다. OpenAPI JSON은 `/v3/api-docs`에서 제공한다. 문서 노출은 서버에 데이터를 자동 삽입하지 않으며 Execute 요청은 연결된 DB를 변경한다.
+
 `backend/`에서 실행한다.
 
 ```powershell
