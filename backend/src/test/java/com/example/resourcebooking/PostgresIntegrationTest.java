@@ -31,8 +31,17 @@ class PostgresIntegrationTest {
     @Autowired
     Flyway flyway;
 
+    @Autowired
+    org.springframework.context.ApplicationContext context;
+
     @LocalServerPort
     int port;
+
+    @Test
+    void 기본_프로필에서는_로컬_샘플_공간을_생성하지_않는다() {
+        assertThat(context.containsBean("localSpaceInitializer")).isFalse();
+        assertThat(new JdbcTemplate(dataSource).queryForObject("select count(*) from spaces", Integer.class)).isZero();
+    }
 
     @Test
     void 애플리케이션을_시작하면_실제_PostgreSQL에_연결되고_최신_마이그레이션이_적용된다() throws Exception {

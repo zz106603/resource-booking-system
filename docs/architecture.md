@@ -4,11 +4,13 @@
 
 공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces`, 예약 생성·취소·목록은 `reservation` 패키지와 V3의 `reservations`로 구현했다. V4는 CONFIRMED 한정 배타 제약을 추가하며 V1~V3는 보존한다. 실행 안내는 [backend-setup.md](backend-setup.md), API 계약은 [space-api.md](space-api.md) 및 [reservation-api.md](reservation-api.md), 최신 동시성 설계·검증은 [reservation-concurrency.md](reservation-concurrency.md), 예약 목록 AC10의 계약·검증은 [reservation-list.md](reservation-list.md), 수용 기준은 [requirements.md](requirements.md)를 따른다.
 
-단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 현재 `backend/`, `docs/`와 루트 `compose.yaml`로 구성한다. `frontend/`는 추후 React·TypeScript·Vite로 개발한다.
+단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 `backend/`, `frontend/`, `docs/`와 루트 `compose.yaml`로 구성한다. 기존 React 계획을 Vue 3·TypeScript·Vite로 변경했으며 프런트엔드는 초기 환경과 공간 목록을 구현했다.
 
 요청 흐름은 HTTP API → 애플리케이션 서비스 → 도메인 규칙 및 영속성 → PostgreSQL이다. 기능별 `space`, `reservation` 패키지와 작은 공통 오류 처리 영역을 제안한다. 별도 Gradle 멀티모듈이나 범용 프레임워크는 도입하지 않는다.
 
 ## 주요 책임
+
+로컬 개발 데이터는 `space/LocalSpaceInitializer`의 local 전용 ApplicationRunner가 Flyway 이후 준비한다. 짧은 트랜잭션에서 spaces 테이블을 잠그고 비어 있을 때만 샘플 4개를 등록한다. 기본 프로필·일반 테스트·CI의 DB에는 영향을 주지 않으며 기존 행·예약·Flyway 파일은 변경하지 않는다. 운영 공통 마이그레이션과 개발 데이터를 분리하며 local은 로컬 DB에서만 명시적으로 사용한다. 실행·검증은 [backend-setup.md](backend-setup.md)를 따른다.
 
 API 탐색·수동 실행은 springdoc-openapi 2.10.0의 Swagger UI로 제공한다. `common/OpenApiConfiguration`은 기존 컨트롤러에서 생성된 문서에 설명·오류 스키마·예시를 추가한다. 문서 캐시를 끄고 Clock으로 미래 예약 예시를 생성하며 도메인 서비스·DB 제약은 변경하지 않는다. 경로·사용법·문서 노출 설정은 [swagger.md](swagger.md)를 따른다.
 
@@ -66,6 +68,10 @@ V4는 테이블의 쓰기를 막은 상태에서 기존 활성 중복을 점검�
 단위 테스트는 시간 경계·겹침·상태 전이를 확인한다. 통합 테스트는 마이그레이션, DB 제약, API 오류 계약, 롤백을 검증한다. 동시성 테스트는 독립 트랜잭션과 충분한 DB 연결을 확보하고 제한 시간 내 완료 여부와 최종 데이터를 확인한다. 테스트 격리를 통해 서로의 예약 데이터에 영향을 주지 않도록 한다.
 
 Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontainers 통합 테스트를 구성했다. 공간 API 결과는 [space-api.md](space-api.md), 예약 생성·취소와 동시성 설계·검증 결과는 [reservation-api.md](reservation-api.md)와 [reservation-concurrency.md](reservation-concurrency.md)에 기록한다. 초기 환경 검증 결과와 CI 실행 절차는 [backend-setup.md](backend-setup.md)에 기록한다. GitHub Actions는 PR 생성·업데이트 및 main push에서 Java 21·Wrapper로 전체 빌드와 PostgreSQL 테스트를 실행하도록 구성했다. Docker 연결 실패는 CI 실패로 처리한다. 현재 예약 API 브랜치에는 예약 생성·취소, 동시성 및 교착 복구 테스트가 포함되며 동일한 CI 빌드 명령의 실행 대상이다. 이 통합 상태의 원격 CI 실행 결과는 아직 확인하지 않았다.
+
+## 프런트엔드 초기 구성
+
+프런트엔드는 Vue SFC·Composition API·Vue Router를 사용한다. `src/api/`는 fetch·계약 타입·최소 응답 검증, `src/views/`는 화면·로컬 상태, `src/assets/`는 반응형 CSS를 담당한다. 전역 상태 저장소·HTTP 라이브러리·UI 프레임워크는 추가하지 않는다. `/`는 `/spaces`로 이동하며 공간 목록·20개 단위 페이지·로딩·오류·재시도·빈 결과를 제공한다. 시각은 문자열을 보존하고 Intl로 Asia/Seoul에 표시한다. 개발 시 Vite `/api` 프록시를 사용하고 운영 프록시·SPA history fallback은 후속 결정이다. 프런트엔드 CI는 기존 백엔드 CI와 독립적이다. 실행·검증·미검증 범위는 [frontend-setup.md](frontend-setup.md)를 따른다.
 
 ## 구현 전에 확인할 미결정 사항
 
