@@ -13,6 +13,8 @@
 
 Swagger UI에서 예시 등록 요청과 조회 파라미터를 실행할 수 있다. 접속·실행 순서는 [swagger.md](swagger.md)를 따른다. 예시 ID 대신 실제 등록 응답의 ID를 입력한다.
 
+Vue 프런트엔드의 초기 화면은 이 계약의 공간 목록과 페이징만 사용한다. 실행·검증 범위는 [frontend-setup.md](frontend-setup.md)를 따른다. 아래 실행 기록은 백엔드 API 구현 당시 결과다.
+
 | 요청 | 성공 응답 |
 | --- | --- |
 | `POST /api/spaces` | 201, `Location: /api/spaces/{id}`, 생성된 공간 |

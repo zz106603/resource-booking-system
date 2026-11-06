@@ -1,6 +1,6 @@
 # 프로젝트 개요
 
-`resource-booking-system`은 Java 21·Spring Boot·Gradle·PostgreSQL 기반 공유 공간 예약 서비스다. JUnit 5·Testcontainers로 통합·동시성 동작을 검증하며, 향후 `backend/`와 React·TypeScript·Vite 기반 `frontend/`를 갖는 모노레포를 지향한다.
+`resource-booking-system`은 Java 21·Spring Boot·Gradle·PostgreSQL 기반 공유 공간 예약 서비스다. JUnit 5·Testcontainers로 통합·동시성 동작을 검증하며, Vue 3·TypeScript·Vite 기반 `frontend/`와 `backend/`를 갖는 모노레포다.
 
 ## 작업 범위와 기본 규칙
 
@@ -17,6 +17,7 @@
 
 - 테스트 메서드명은 조건과 기대 결과가 드러나는 한글로 작성한다. 예: `존재하지_않는_공간을_조회하면_404를_반환한다`.
 - 백엔드 실행·검증 절차는 [docs/backend-setup.md](docs/backend-setup.md)를 따른다. 없는 명령을 검증된 명령처럼 제시하지 않는다.
+- 프런트엔드 작업은 [frontend/AGENTS.md](frontend/AGENTS.md)와 [docs/frontend-setup.md](docs/frontend-setup.md)를 따른다. 변경 범위에 맞는 lint·타입 검사·테스트·빌드를 수행하고, 모킹 테스트와 실제 백엔드 연결 검증을 구분한다.
 - 초기화 이후 실제 빌드 파일·Wrapper·테스트 설정을 확인하고 변경 범위에 맞는 검증을 실행한다. PostgreSQL 통합·동시성 검증을 메모리 DB 결과로 대체하지 않는다.
 - 실행한 명령, 결과 및 실행하지 못한 검증과 이유를 구분해 보고한다. 미실행·실패·환경 차단을 성공으로 기록하지 않는다. 커밋 메시지와 PR 설명에도 같은 원칙을 적용한다.
 - 문서 작업은 요구사항과 설계의 일관성, 참조 경로, Git diff 및 변경 범위를 확인한다. 문서 점검을 빌드·테스트 성공으로 표현하지 않는다.
