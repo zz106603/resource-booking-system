@@ -2,6 +2,8 @@
 
 ## 승인한 계약
 
+Swagger UI의 필터 예시는 [swagger.md](swagger.md)를 따른다. 선택 필터 예시는 서버 기본값이 아니며, from/to를 함께 지정하는 계약과 미지정·빈 값의 구분은 유지한다.
+
 - `GET /api/reservations`: 200과 `content`, `page`, `size`, `totalElements`, `totalPages`를 반환한다. content 항목은 기존 ReservationResponse와 같다.
 - `spaceId`는 선택인 양의 BIGINT다. 생략하면 전체 공간, 지정한 공간이 없으면 404 SPACE_NOT_FOUND다.
 - `status`는 선택이며 정확히 CONFIRMED 또는 CANCELLED다. 생략하면 두 상태를 모두 조회한다.

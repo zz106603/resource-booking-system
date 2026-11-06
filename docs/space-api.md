@@ -11,6 +11,8 @@
 
 ## 이번 구현의 계약
 
+Swagger UI에서 예시 등록 요청과 조회 파라미터를 실행할 수 있다. 접속·실행 순서는 [swagger.md](swagger.md)를 따른다. 예시 ID 대신 실제 등록 응답의 ID를 입력한다.
+
 | 요청 | 성공 응답 |
 | --- | --- |
 | `POST /api/spaces` | 201, `Location: /api/spaces/{id}`, 생성된 공간 |
