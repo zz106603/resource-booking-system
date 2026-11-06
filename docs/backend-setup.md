@@ -42,6 +42,16 @@ DB는 `127.0.0.1:15432`, 데이터베이스·사용자는 `resource_booking`, �
 .\gradlew.bat bootRun --no-daemon
 ```
 
+샘플 공간이 필요한 로컬 개발에서는 대신 아래 명령을 사용한다. 로컬 DB 연결에서만 활성화한다.
+
+```powershell
+.\gradlew.bat bootRun --args='--spring.profiles.active=local' --no-daemon
+```
+
+`local` 프로필의 `LocalSpaceInitializer`는 Flyway 적용 후 시작 초기화에서 공간이 **0개일 때만** 회의실 A(6명)·회의실 B(10명)·스터디룸(4명)·세미나실(20명)을 등록한다. 공간이 1개라도 있으면 기존 공간·예약을 그대로 두고 아무것도 추가하지 않는다. 매번 채워서 4개로 맞추는 기능이 아니며 기존 ID·내용·예약을 수정하거나 삭제하지 않는다. 전체 공간을 삭제한 경우 다음 local 기동에서 다시 4개가 생긴다. ID는 DB가 생성하므로 1~4라고 가정하지 않는다.
+
+기본 프로필·기존 통합 테스트·CI에서는 활성화하지 않는다(전용 local 초기화 테스트만 예외). Docker PostgreSQL 시작만으로 데이터가 생성되는 것은 아니며 local 백엔드가 시작되어야 한다. Docker init SQL은 기존 볼륨 재시작에 적용되지 않고 공간 스키마는 Flyway가 생성하므로 사용하지 않는다. 공통 Flyway 마이그레이션에 개발 데이터를 추가하거나 data.sql 초기화를 혼용하지 않았다. 검증 결과는 아래 로컬 샘플 공간 절에 기록한다.
+
 기본 HTTP 포트는 8080이다. `/`에는 API가 없어 404이며, 공간 API는 `/api/spaces`에서 제공한다. 시작 로그의 `Started ResourceBookingApplication`과 Flyway 적용 결과로 기동 여부를 확인한다. 종료는 Ctrl+C를 사용한다.
 
 연결 설정은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` 환경변수로 변경한다. DB 공개 포트를 변경하려면 Compose의 `POSTGRES_PORT`와 JDBC URL의 포트를 함께 맞춘다. `.env`는 Compose 보간에만 사용되며 Spring Boot에 자동 로드되지 않는다.
@@ -53,6 +63,18 @@ docker compose down
 ```
 
 ## 빌드와 통합 테스트
+
+### 로컬 샘플 공간 검증 (2026-11-06)
+
+실제 Testcontainers PostgreSQL에서 local 시작 시 4개 등록·빈 공간 재등록·재실행 시 동일 데이터 유지·기존 공간과 예약 보존을 검증한다. 기본 프로필에서는 빈 공간 테이블을 유지하고 초기화 빈도 생성하지 않는다. 동시 local 기동 시 중복 삽입을 막기 위해 짧은 초기화 트랜잭션에서 spaces의 SHARE ROW EXCLUSIVE 잠금을 잡고 개수를 확인한다. 예약 생성 경로의 동시성 제어는 변경하지 않는다. 다중 기동 부하 측정은 수행하지 않는다.
+
+초기 RED 실행은 `.\gradlew.bat test --tests '*LocalSpaceInitializerIntegrationTest' --tests '*PostgresIntegrationTest' --no-daemon`: 10개 중 local 4개 실패·기본 환경 6개 통과(45초)다. 구현 후 `.\gradlew.bat clean build --no-daemon`은 BUILD SUCCESSFUL(1분 53초), 전체 164개·실패/오류/건너뜀 0이다. 기존 예약 생성·취소·목록·동시성·교착 복구·마이그레이션·Swagger 테스트를 포함한다. 프런트엔드 npm run lint·npm run test:unit(10개)·npm run build(타입 검사 포함)도 통과했다. 기존 Swagger Schema unchecked 및 JVM 클래스 공유 경고는 남았으나 빌드 실패는 없다.
+
+`.\gradlew.bat bootRun --args='--spring.profiles.active=local' --no-daemon`도 실제 기동했다. 기존 개발 DB 대신 별도 PostgreSQL 17.11 임시 컨테이너(seed_check, 15433)와 SERVER_PORT=18080을 환경변수로 지정해 검증했다. HTTP GET /api/spaces에서 위 이름·인원의 4개 공간, /api/reservations에서 0개를 확인한 후 검증용 애플리케이션과 --rm 컨테이너를 종료하고 포트 해제를 확인했다. 기존 Compose 데이터는 사용하거나 변경하지 않았다.
+
+Superpowers requesting-code-review의 독립 리뷰어 Subagent가 기준 origin/main·HEAD `46a2868` 대비 이번 초기화 코드·테스트·관련 문서를 검토했다. 기존 미커밋 프런트엔드는 이전 리뷰 범위이므로 중복 리뷰하지 않았다. Critical 0·Important 0·Minor 1건(이전 프런트엔드 문서의 백엔드 미검증 문장이 현재 164개 실행 기록과 충돌)을 확인해 해당 문서를 시간순으로 바로잡았다. 기능 결함이나 코드 수정은 없었다. 리뷰어는 JUnit XML 합산164개·실패/오류/건너뜀0과 diff 검사를 직접 확인했고 빌드·스모크를 재실행하지 않았다.
+
+문서 링크·diff·신규 파일 공백 검사를 통과했다. 다중 프로세스 동시 초기화 실험·브라우저·원격 CI·Trivy 재검사는 이번에 실행하지 않았다. 기존 프런트엔드의 Minor 테스트 보강과 개발 의존성 audit 항목은 그대로 남아 있다. 커밋·push는 하지 않았다.
 
 Swagger UI는 애플리케이션 실행 후 <http://localhost:8080/swagger-ui/index.html>에서 접속한다. 예시 요청 실행 순서, 실제 ID 입력과 미래 예약 시각의 갱신 방식은 [swagger.md](swagger.md)를 따른다. OpenAPI JSON은 `/v3/api-docs`에서 제공한다. 문서 노출은 서버에 데이터를 자동 삽입하지 않으며 Execute 요청은 연결된 DB를 변경한다.
 
