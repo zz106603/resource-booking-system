@@ -1,6 +1,6 @@
 # Resource Booking 프런트엔드
 
-Vue 3·TypeScript·Vite SPA. 현재 공간 목록과 페이지 조회를 제공한다.
+Vue 3·TypeScript·Vite SPA. 공간 목록·페이지 조회·등록·상세를 제공한다. 화면 계약과 최신 검증은 [공간 화면 안내](../docs/frontend-space-screens.md)를 따른다.
 
 설치·개발 서버·검증 명령·실제 연동 범위는 [프런트엔드 실행 안내](../docs/frontend-setup.md)를 따른다. 작업 지침은 [AGENTS.md](AGENTS.md)에 있다.
 
