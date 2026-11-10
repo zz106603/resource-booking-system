@@ -21,7 +21,7 @@ describe('공간 API', () => {
 
   it('오류_응답이_JSON이_아니면_내부_본문을_노출하지_않는다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>secret</html>', { status: 502 })))
-    await expect(listSpaces(0)).rejects.toThrow('목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    await expect(listSpaces(0)).rejects.toThrow('요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   })
 
   it('안전_정수_범위를_넘는_ID는_잘못된_값으로_표시하지_않는다', async () => {

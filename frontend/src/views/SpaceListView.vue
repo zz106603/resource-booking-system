@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { listSpaces, type SpacePage } from '../api/spaces'
 
 const result = ref<SpacePage | null>(null)
@@ -46,6 +47,7 @@ onBeforeUnmount(() => { requestId++; controller?.abort() })
       </div>
       <p class="timezone">시간 기준 <strong>Asia/Seoul</strong></p>
     </div>
+    <p class="list-actions"><RouterLink to="/spaces/new" class="button-link">+ 공간 등록</RouterLink></p>
 
     <div v-if="loading" class="notice" role="status">공간 목록을 불러오는 중입니다…</div>
     <div v-else-if="error" class="notice error-state">
@@ -65,7 +67,7 @@ onBeforeUnmount(() => { requestId++; controller?.abort() })
       <ul v-else class="space-grid">
         <li v-for="space in result.content" :key="space.id" class="space-card">
           <div class="card-top"><span class="space-id">SPACE {{ String(space.id).padStart(3, '0') }}</span><span class="capacity">{{ space.capacity }}명</span></div>
-          <h2>{{ space.name }}</h2>
+          <h2><RouterLink :to="`/spaces/${space.id}`">{{ space.name }}</RouterLink></h2>
           <p class="description">{{ space.description || '등록된 설명이 없습니다.' }}</p>
           <p class="created-at">등록 <time :datetime="space.createdAt">{{ seoulTime.format(new Date(space.createdAt)) }}</time></p>
         </li>

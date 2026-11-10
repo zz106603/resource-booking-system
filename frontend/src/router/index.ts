@@ -5,6 +5,8 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/spaces' },
     { path: '/spaces', component: () => import('../views/SpaceListView.vue') },
+    { path: '/spaces/new', component: () => import('../views/SpaceCreateView.vue') },
+    { path: '/spaces/:id', component: () => import('../views/SpaceDetailView.vue') },
     { path: '/:pathMatch(.*)*', component: () => import('../views/NotFoundView.vue') },
   ],
 })

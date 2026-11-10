@@ -73,6 +73,8 @@ Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontai
 
 프런트엔드는 Vue SFC·Composition API·Vue Router를 사용한다. `src/api/`는 fetch·계약 타입·최소 응답 검증, `src/views/`는 화면·로컬 상태, `src/assets/`는 반응형 CSS를 담당한다. 전역 상태 저장소·HTTP 라이브러리·UI 프레임워크는 추가하지 않는다. `/`는 `/spaces`로 이동하며 공간 목록·20개 단위 페이지·로딩·오류·재시도·빈 결과를 제공한다. 시각은 문자열을 보존하고 Intl로 Asia/Seoul에 표시한다. 개발 시 Vite `/api` 프록시를 사용하고 운영 프록시·SPA history fallback은 후속 결정이다. 프런트엔드 CI는 기존 백엔드 CI와 독립적이다. 실행·검증·미검증 범위는 [frontend-setup.md](frontend-setup.md)를 따른다.
 
+공간 화면은 기존 구조를 확장한 SpaceCreateView·SpaceDetailView를 사용한다. 공통 요청 계층은 POST와 fieldErrors 보존을 지원하고 Space 응답 검증을 재사용한다. 등록은 로컬 폼 상태·수동 제출, 상세는 경로 감시와 요청 취소를 사용한다. 추가 라이브러리나 백엔드 계약 변경은 없다. 현재 화면 범위와 검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다.
+
 ## 구현 전에 확인할 미결정 사항
 
 1. 시작 전 최초 취소, 시각과 무관한 재취소 성공, 미래 예약·마이크로초 정밀도는 구현 계약으로 채택했다. 인증·소유자 권한은 후속 과제다.
