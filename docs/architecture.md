@@ -77,7 +77,7 @@ Gradle Wrapper와 빌드 파일, 로컬 PostgreSQL Docker Compose 및 Testcontai
 
 공간 화면은 기존 구조를 확장한 SpaceCreateView·SpaceDetailView를 사용한다. 공통 요청 계층은 POST와 fieldErrors 보존을 지원하고 Space 응답 검증을 재사용한다. 등록은 로컬 폼 상태·수동 제출, 상세는 경로 감시와 요청 취소를 사용한다. 추가 라이브러리나 백엔드 계약 변경은 없다. 현재 화면 범위와 검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다.
 
-예약 생성은 `/reservations/new`와 ReservationCreateView의 로컬 상태로 구현했다. 공간 API의20개 페이징·개별 상세로 선택과 사전선택을 제공하고 분 단위 서울 입력에 +09:00을 명시해 POST한다. API 타입·날짜 검증은 api/reservations.ts에서 관리한다. 409는 입력을 유지하고 성공 결과는 같은 화면에 표시한다. POST는 자동 재시도하지 않으며 목록·취소 화면은 후속이다. 상세 계약·검증은 [frontend-reservation-create.md](frontend-reservation-create.md)를 따른다.
+예약 생성은 `/reservations/new`와 ReservationCreateView의 로컬 상태로 구현했다. 공간 API의20개 페이징·개별 상세로 선택과 사전선택을 제공하고 날짜와 00:00~24:00의 30분 단위 서울 입력에 +09:00을 명시해 POST한다. API 타입·날짜 검증은 api/reservations.ts에서 관리한다. 409는 입력을 유지하고 성공 결과는 같은 화면에 표시한다. POST는 자동 재시도하지 않으며 목록·취소는 `/reservations`에서 제공한다([화면 계약](frontend-reservation-list.md)). 상세 계약·검증은 [frontend-reservation-create.md](frontend-reservation-create.md)를 따른다.
 
 ## 구현 전에 확인할 미결정 사항
 

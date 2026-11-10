@@ -98,4 +98,48 @@ describe('공간 등록·상세 화면', () => {
     expect(wrapper.text()).not.toContain('회의실')
     wrapper.unmount()
   })
+  it.each(['성공', '실패'])('등록_중_화면을_떠나면_늦은_%s가_이동하거나_오류를_남기지_않는다', async (outcome) => {
+    let resolve!: (value: typeof space) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(createSpace).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const { wrapper, router } = await setup('/spaces/new')
+    const state = wrapper.findComponent(SpaceCreateView).vm as unknown as { error: string }
+    await fill(wrapper)
+    await wrapper.get('form').trigger('submit')
+    await router.push('/spaces')
+    await flushPromises()
+    if (outcome === '성공') resolve(space); else reject(new Error('늦은 등록 오류'))
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/spaces')
+    expect(wrapper.text()).toBe('목록')
+    expect(state.error).toBe('')
+    wrapper.unmount()
+  })
+  it('경로가_바뀌면_늦은_이전_상세_실패가_최신_공간을_덮어쓰지_않는다', async () => {
+    let reject!: (reason: Error) => void
+    vi.mocked(getSpace).mockReturnValueOnce(new Promise((_, no) => { reject = no })).mockResolvedValueOnce({ ...space, id: 8, name: '최신 공간' })
+    const { wrapper, router } = await setup('/spaces/7')
+    await router.push('/spaces/8')
+    await flushPromises()
+    reject(new Error('늦은 상세 오류'))
+    await flushPromises()
+    expect(wrapper.text()).toContain('최신 공간')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it.each(['성공', '실패'])('상세_화면을_떠나면_늦은_%s가_상태를_갱신하지_않는다', async (outcome) => {
+    let resolve!: (value: typeof space) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(getSpace).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const { wrapper, router } = await setup('/spaces/7')
+    const state = wrapper.findComponent(SpaceDetailView).vm as unknown as { error: string; space: unknown }
+    await router.push('/spaces')
+    await flushPromises()
+    if (outcome === '성공') resolve(space); else reject(new Error('늦은 상세 오류'))
+    await flushPromises()
+    expect(state.space).toBeNull()
+    expect(state.error).toBe('')
+    expect(wrapper.text()).toBe('목록')
+    wrapper.unmount()
+  })
 })

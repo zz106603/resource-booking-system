@@ -72,4 +72,29 @@ describe('공간 목록 화면', () => {
     wrapper.unmount()
     expect(signal.aborted).toBe(true)
   })
+  it.each(['성공', '실패'])('새_목록보다_늦은_이전_%s를_반영하지_않는다', async (outcome) => {
+    let resolve!: (value: typeof page) => void
+    let reject!: (reason: Error) => void
+    list.mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no })).mockResolvedValueOnce({ ...page, content: [{ ...space, name: '최신 공간' }] })
+    const wrapper = mount(SpaceListView, { global: { stubs: { RouterLink: RouterLinkStub } } })
+    // 중단된 요청을 무시하는 서버를 재현해 두 GET을 직접 겹친다.
+    await (wrapper.vm as unknown as { load: (page: number) => Promise<void> }).load(0)
+    if (outcome === '성공') resolve(page); else reject(new Error('늦은 목록 오류'))
+    await flushPromises()
+    expect(wrapper.text()).toContain('최신 공간')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it.each(['성공', '실패'])('목록_화면_이탈_후_늦은_%s가_상태를_갱신하지_않는다', async (outcome) => {
+    let resolve!: (value: typeof page) => void
+    let reject!: (reason: Error) => void
+    list.mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const wrapper = mount(SpaceListView, { global: { stubs: { RouterLink: RouterLinkStub } } })
+    const state = wrapper.vm as unknown as { error: string; result: unknown }
+    wrapper.unmount()
+    if (outcome === '성공') resolve(page); else reject(new Error('늦은 목록 오류'))
+    await flushPromises()
+    expect(state.result).toBeNull()
+    expect(state.error).toBe('')
+  })
 })
