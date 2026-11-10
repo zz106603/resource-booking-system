@@ -6,7 +6,7 @@
 
 Node는 로컬·CI 모두 `.nvmrc`의 24.15.0, npm은 로컬 11.12.1을 사용했다. 의존성은 package-lock.json으로 고정하고 npm ci로 설치한다. [Vue 공식 초기화](https://vuejs.org/guide/quick-start.html)와 [TypeScript 안내](https://vuejs.org/guide/typescript/overview)를 참고한다.
 
-`/`는 `/spaces`로 이동한다. 공간 이름·설명·수용 인원·등록 시각, 전체 건수와 이전/다음 페이지를 표시한다. 목록은 ID 오름차순, page=0부터·size=20 고정이다. 로딩·빈 결과·네트워크/서버 오류·재시도를 구분한다. 공간 등록(`/spaces/new`)·상세(`/spaces/:id`)도 제공한다. 계약과 최신 검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다. 예약 화면은 아직 구현하지 않았다.
+`/`는 `/spaces`로 이동한다. 공간 이름·설명·수용 인원·등록 시각, 전체 건수와 이전/다음 페이지를 표시한다. 목록은 ID 오름차순, page=0부터·size=20 고정이다. 로딩·빈 결과·네트워크/서버 오류·재시도를 구분한다. 공간 등록(`/spaces/new`)·상세(`/spaces/:id`)도 제공한다. 계약과 최신 검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다. 예약 생성(`/reservations/new`)도 제공하며 공간 상세에서 사전선택할 수 있다. 최신 계약·검증은 [frontend-reservation-create.md](frontend-reservation-create.md)를 따른다. 예약 목록·취소 화면은 미구현이다.
 
 ## 실행
 
@@ -26,7 +26,7 @@ Vite 프록시는 개발용이다. build의 dist는 정적 산출물이며 운�
 
 - 계약 기준은 [space-api.md](space-api.md), 실제 백엔드 `/v3/api-docs`다. Space·SpacePage는 `src/api/spaces.ts`에 정의한다. 날짜 문자열을 보존하고 정수 ID·페이지 메타데이터와 필수 응답 형식을 확인한다.
 - Java BIGINT 전체 범위를 JS number로 정확히 표현할 수 없다. 현재는 안전 정수 범위를 넘으면 응답 오류로 처리해 잘못 반올림된 ID를 표시하지 않는다. 큰 ID 지원은 백엔드와 문자열 ID 계약을 별도로 정해야 한다.
-- `Intl.DateTimeFormat`의 timeZone을 Asia/Seoul로 고정하고 시간대를 화면에 명시한다. 저장값을 바꾸거나 브라우저 시간대에 따라 표시하지 않는다. 예약 입력·오프셋 전송은 후속 작업이다.
+- `Intl.DateTimeFormat`의 timeZone을 Asia/Seoul로 고정하고 시간대를 화면에 명시한다. 저장값을 바꾸거나 브라우저 시간대에 따라 표시하지 않는다. 예약 생성은 서울 분 단위 입력을 +09:00으로 전송한다. 상세 계약은 frontend-reservation-create.md를 따른다.
 - `src/api/client.ts`는 JSON 요청과 공통 오류를 처리한다. 비JSON 오류 본문을 화면에 노출하지 않는다. SpaceListView는 로컬 상태를 사용하고 새 요청·화면 이탈 시 이전 요청을 취소하며 오래된 결과를 반영하지 않는다.
 - 테스트 설명은 한글로 작성한다. 단위·컴포넌트 테스트의 API 모킹과 실제 PostgreSQL·HTTP 연동을 구분한다.
 
@@ -64,4 +64,4 @@ Superpowers requesting-code-review의 독립 리뷰어 Subagent가 origin/main·
 
 Minor는 취소 후 늦게 도착하는 Promise의 resolve/reject를 무시하는 회귀 테스트 보강이다. requestId 방어는 코드상 적절하나 현재 unmount 테스트는 AbortSignal 취소만 검증한다. 동작 결함은 확인되지 않았고 완료를 막는 지적이 아니므로 후속 테스트 보강으로 남긴다. 중요한 코드 수정이 없어 중복 리뷰는 하지 않았다. 리뷰어는 diff 검사만 직접 실행했으며 테스트·빌드·audit·브라우저·원격 Actions를 재실행하지 않았다.
 
-원격 GitHub Actions, 브라우저 E2E, 프런트엔드 별도 Trivy는 미실행이다. 프런트엔드 초기 구성 단계에서는 전체 백엔드 테스트를 재실행하지 않았으나, 이후 같은 브랜치의 local 샘플 공간 추가 후 전체 백엔드 clean build를 실행해 164개·실패/오류/건너뜀 0을 확인했다. 프런트엔드 lint·테스트 10개·타입 검사 포함 build도 다시 통과했다. local 실행·검증·리뷰 기록은 [backend-setup.md](backend-setup.md)를 따른다. 이후 공간 등록·상세 화면은 frontend-space-screens.md에서 구현·검증했고 다음 구현은 예약 화면이다. 브라우저 실제 UI 검증·개발 의존성 moderate 항목 확인·늦은 응답 회귀 테스트는 남은 검증 작업이다. 커밋·push는 하지 않았다.
+원격 GitHub Actions, 브라우저 E2E, 프런트엔드 별도 Trivy는 미실행이다. 프런트엔드 초기 구성 단계에서는 전체 백엔드 테스트를 재실행하지 않았으나, 이후 같은 브랜치의 local 샘플 공간 추가 후 전체 백엔드 clean build를 실행해 164개·실패/오류/건너뜀 0을 확인했다. 프런트엔드 lint·테스트 10개·타입 검사 포함 build도 다시 통과했다. local 실행·검증·리뷰 기록은 [backend-setup.md](backend-setup.md)를 따른다. 이후 공간 등록·상세 화면은 frontend-space-screens.md에서 구현·검증했고 예약 생성은 frontend-reservation-create.md에서 구현·검증했고 다음 구현은 예약 목록·취소 화면이다. 브라우저 실제 UI 검증·개발 의존성 moderate 항목 확인·늦은 응답 회귀 테스트는 남은 검증 작업이다. 커밋·push는 하지 않았다.
