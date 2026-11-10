@@ -3,11 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ReservationCreateView from '../views/ReservationCreateView.vue'
 import { listSpaces, getSpace } from '../api/spaces'
-import { createReservation } from '../api/reservations'
+import { createReservation, listConfirmedIntervals } from '../api/reservations'
 import { ApiError } from '../api/client'
 
 vi.mock('../api/spaces', () => ({ listSpaces: vi.fn(), getSpace: vi.fn() }))
-vi.mock('../api/reservations', async original => ({ ...await original<typeof import('../api/reservations')>(), createReservation: vi.fn() }))
+vi.mock('../api/reservations', async original => ({ ...await original<typeof import('../api/reservations')>(), createReservation: vi.fn(), listConfirmedIntervals: vi.fn() }))
 const space = { id: 7, name: '회의실', description: null, capacity: 6, createdAt: '2026-01-01T00:00:00Z' }
 const page = { content: [space], page: 0, size: 20, totalElements: 21, totalPages: 2 }
 const receipt = { id: 31, spaceId: 7, bookerName: '예약자', startAt: '2026-11-11T01:00:00Z', endAt: '2026-11-11T02:00:00Z', status: 'CONFIRMED' as const, createdAt: '2026-11-10T00:00:00Z', cancelledAt: null }
@@ -26,14 +26,18 @@ async function setup(query = '') {
 async function fill(wrapper: ReturnType<typeof mount>) {
   await wrapper.get('#spaceId').setValue('7')
   await wrapper.get('#bookerName').setValue('예약자')
-  await wrapper.get('#startAt').setValue('2026-11-11T10:00')
-  await wrapper.get('#endAt').setValue('2026-11-11T11:00')
+  await wrapper.get('#startDate').setValue('2026-11-11')
+  await wrapper.get('#endDate').setValue('2026-11-11')
+  await flushPromises()
+  await wrapper.get('#startTime').setValue('10:00')
+  await wrapper.get('#endTime').setValue('11:00')
 }
 describe('예약 생성 화면', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-10T00:00:00Z'))
     vi.mocked(listSpaces).mockResolvedValue(page)
+    vi.mocked(listConfirmedIntervals).mockResolvedValue([])
   })
   afterEach(() => { vi.resetAllMocks(); vi.useRealTimers() })
   it('공간_선택과_서울_시간대_안내를_표시한다', async () => {
@@ -67,6 +71,8 @@ describe('예약 생성 화면', () => {
   })
   it('잘못된_입력은_요청하지_않고_오류를_표시한다', async () => {
     const { wrapper } = await setup()
+    await fill(wrapper)
+    await wrapper.get('#bookerName').setValue(' ')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.get('#bookerName-error').text()).toContain('예약자')
     expect(createReservation).not.toHaveBeenCalled()
@@ -79,7 +85,9 @@ describe('예약 생성 화면', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('이미 예약된 시간')
-    expect((wrapper.get('#startAt').element as HTMLInputElement).value).toBe('2026-11-11T10:00')
+    expect((wrapper.get('#startDate').element as HTMLInputElement).value).toBe('2026-11-11')
+    expect((wrapper.get('#startTime').element as HTMLSelectElement).value).toBe('10:00')
+    expect(listConfirmedIntervals).toHaveBeenCalledTimes(3)
     wrapper.unmount()
   })
   it('성공하면_예약_번호와_서울_시간을_표시한다', async () => {
@@ -136,6 +144,8 @@ describe('예약 생성 화면', () => {
     const { wrapper } = await setup('?spaceId=99')
     expect(wrapper.get('[role="alert"]').text()).toContain('존재하지 않습니다')
     await wrapper.get('#spaceId').setValue('7')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await fill(wrapper)
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
@@ -148,6 +158,85 @@ describe('예약 생성 화면', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('일시적인 서버 경합')
     expect(createReservation).toHaveBeenCalledTimes(1)
     expect((wrapper.get('#bookerName').element as HTMLInputElement).value).toBe('예약자')
+    wrapper.unmount()
+  })
+  it('시간_선택은_오전오후_없이_30분_간격의_00시부터_24시까지다', async () => {
+    const { wrapper } = await setup()
+    const values = wrapper.findAll('#startTime option').map(option => option.attributes('value')).filter(Boolean)
+    expect(values).toHaveLength(49)
+    expect(values.slice(0, 3)).toEqual(['00:00', '00:30', '01:00'])
+    expect(values.slice(-2)).toEqual(['23:30', '24:00'])
+    expect(wrapper.get('#startTime').text()).not.toMatch(/오전|오후/)
+    wrapper.unmount()
+  })
+  it('24시는_다음_날_00시로_정규화해_제출한다', async () => {
+    vi.mocked(createReservation).mockResolvedValue(receipt)
+    const { wrapper } = await setup()
+    await fill(wrapper)
+    await wrapper.get('#startTime').setValue('23:30')
+    await wrapper.get('#endTime').setValue('24:00')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(createReservation).toHaveBeenCalledWith(expect.objectContaining({ startAt: '2026-11-11T23:30', endAt: '2026-11-12T00:00' }))
+    wrapper.unmount()
+  })
+  it('예약과_겹치는_시작과_종료는_막고_맞닿는_구간은_허용한다', async () => {
+    vi.mocked(listConfirmedIntervals).mockResolvedValue([{ start: Date.parse('2026-11-11T01:30:00Z'), end: Date.parse('2026-11-11T02:30:00Z') }])
+    const { wrapper } = await setup()
+    await fill(wrapper)
+    expect(wrapper.get('#startTime option[value="10:30"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('#startTime option[value="11:30"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('#endTime option[value="10:30"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('#endTime option[value="11:00"]').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+  it('현황_조회_중에는_선택과_제출을_차단한다', async () => {
+    vi.mocked(listConfirmedIntervals).mockReturnValue(new Promise(() => {}))
+    const { wrapper } = await setup()
+    await wrapper.get('#spaceId').setValue('7')
+    await wrapper.get('#startDate').setValue('2026-11-11')
+    expect(wrapper.get('#startTime').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+  it('현황_실패_후_새로고침하면_시간을_선택할_수_있다', async () => {
+    vi.mocked(listConfirmedIntervals).mockRejectedValueOnce(new Error('예약 현황 오류')).mockResolvedValue([])
+    const { wrapper } = await setup()
+    await wrapper.get('#spaceId').setValue('7')
+    await wrapper.get('#startDate').setValue('2026-11-11')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('예약 현황 오류')
+    expect(wrapper.get('#startTime').attributes('disabled')).toBeDefined()
+    const refresh = wrapper.findAll('button').find(button => button.text() === '예약 현황 새로고침')!
+    await refresh.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#startTime').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+  it('새로_예약된_시간은_선택에서_해제한다', async () => {
+    const { wrapper } = await setup()
+    await fill(wrapper)
+    vi.mocked(listConfirmedIntervals).mockResolvedValue([{ start: Date.parse('2026-11-11T01:00:00Z'), end: Date.parse('2026-11-11T02:00:00Z') }])
+    await wrapper.findAll('button').find(button => button.text() === '예약 현황 새로고침')!.trigger('click')
+    await flushPromises()
+    expect((wrapper.get('#startTime').element as HTMLSelectElement).value).toBe('')
+    expect((wrapper.get('#endTime').element as HTMLSelectElement).value).toBe('')
+    expect(createReservation).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it('날짜를_변경하면_취소를_무시한_늦은_이전_현황을_반영하지_않는다', async () => {
+    let resolve!: (value: { start: number; end: number }[]) => void
+    vi.mocked(listConfirmedIntervals).mockReturnValueOnce(new Promise(r => { resolve = r })).mockResolvedValue([])
+    const { wrapper } = await setup()
+    await wrapper.get('#spaceId').setValue('7')
+    await wrapper.get('#startDate').setValue('2026-11-11')
+    const previousSignal = vi.mocked(listConfirmedIntervals).mock.calls[0]![3]
+    await wrapper.get('#startDate').setValue('2026-11-12')
+    await flushPromises()
+    resolve([{ start: Date.parse('2026-11-12T01:00:00Z'), end: Date.parse('2026-11-12T02:00:00Z') }])
+    await flushPromises()
+    expect(previousSignal.aborted).toBe(true)
+    expect(wrapper.get('#startTime option[value="10:00"]').attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
 })
