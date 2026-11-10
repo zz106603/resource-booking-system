@@ -15,6 +15,7 @@ const result = ref<ReservationPage | null>(null)
 const loading = ref(false)
 const listError = ref('')
 const notice = ref('')
+const noticeElement = ref<HTMLElement | null>(null)
 const confirmation = ref<Reservation | null>(null)
 const confirmTitle = ref<HTMLElement | null>(null)
 let cancelOpener: HTMLButtonElement | null = null
@@ -80,6 +81,9 @@ async function confirmCancel() {
     if (!active) return
     notice.value = `예약 #${row.id}이 취소되었습니다. 목록을 다시 조회합니다.`
     confirmation.value = null
+    await nextTick()
+    if (!active) return
+    noticeElement.value?.focus()
     await load(page)
   } catch (cause) {
     if (!active) return
@@ -108,7 +112,7 @@ onBeforeUnmount(() => { active = false; requestId++; controller?.abort() })
         <div class="filter-actions"><button type="submit">필터 적용</button><button type="button" @click="resetFilters">필터 초기화</button></div>
       </fieldset>
     </form>
-    <p v-if="notice" role="status" class="notice">{{ notice }}</p>
+    <p v-if="notice" ref="noticeElement" role="status" class="notice" tabindex="-1">{{ notice }}</p>
     <section v-if="confirmation" class="cancel-confirmation" aria-labelledby="cancel-title">
       <h2 id="cancel-title" ref="confirmTitle" tabindex="-1">이 예약을 취소할까요?</h2><p>예약 #{{ confirmation.id }} · 공간 ID {{ confirmation.spaceId }} · {{ confirmation.bookerName }}</p><p>{{ time(confirmation.startAt) }} ~ {{ time(confirmation.endAt) }} (Asia/Seoul)</p>
       <p v-if="cancelError" role="alert" class="field-error">{{ cancelError }}</p><p v-if="cancelling" role="status">취소하는 중입니다…</p>

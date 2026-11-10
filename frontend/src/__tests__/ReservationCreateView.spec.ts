@@ -239,4 +239,70 @@ describe('예약 생성 화면', () => {
     expect(wrapper.get('#startTime option[value="10:00"]').attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
+  it.each(['성공', '실패'])('사전선택_query가_바뀌면_늦은_이전_%s를_무시한다', async (outcome) => {
+    let resolve!: (value: typeof space) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(getSpace).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no })).mockResolvedValueOnce({ ...space, id: 99, name: '최신 선택 공간' })
+    const { wrapper, router } = await setup('?spaceId=7')
+    await router.push('/reservations/new?spaceId=99')
+    await flushPromises()
+    if (outcome === '성공') resolve(space); else reject(new Error('늦은 선택 오류'))
+    await flushPromises()
+    expect((wrapper.get('#spaceId').element as HTMLSelectElement).value).toBe('99')
+    expect(wrapper.text()).not.toContain('늦은 선택 오류')
+    wrapper.unmount()
+  })
+  it.each(['성공', '실패'])('사전선택_중_화면을_떠나면_늦은_%s가_상태를_갱신하지_않는다', async (outcome) => {
+    let resolve!: (value: typeof space) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(getSpace).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const { wrapper, router } = await setup('?spaceId=7')
+    const state = wrapper.findComponent(ReservationCreateView).vm as unknown as { error: string; spaceId: string }
+    await router.push('/spaces')
+    await flushPromises()
+    if (outcome === '성공') resolve(space); else reject(new Error('늦은 선택 오류'))
+    await flushPromises()
+    expect(state.spaceId).toBe('')
+    expect(state.error).toBe('')
+    expect(wrapper.text()).toBe('목록')
+    wrapper.unmount()
+  })
+  it.each(['성공', '실패'])('예약_제출_후_화면을_떠나면_늦은_%s가_결과를_남기지_않는다', async (outcome) => {
+    let resolve!: (value: typeof receipt) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(createReservation).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    const { wrapper, router } = await setup()
+    const state = wrapper.findComponent(ReservationCreateView).vm as unknown as { error: string; receipt: unknown }
+    await fill(wrapper)
+    await wrapper.get('form').trigger('submit')
+    expect(createReservation).toHaveBeenCalledTimes(1)
+    await router.push('/spaces')
+    await flushPromises()
+    if (outcome === '성공') resolve(receipt); else reject(new Error('늦은 예약 오류'))
+    await flushPromises()
+    expect(state.receipt).toBeNull()
+    expect(state.error).toBe('')
+    expect(wrapper.text()).toBe('목록')
+    wrapper.unmount()
+  })
+  it.each(['성공', '실패'])('예약_제출_후_query가_바뀌면_이전_%s가_새_선택을_덮어쓰지_않는다', async (outcome) => {
+    let resolve!: (value: typeof receipt) => void
+    let reject!: (reason: Error) => void
+    vi.mocked(createReservation).mockReturnValueOnce(new Promise((yes, no) => { resolve = yes; reject = no }))
+    vi.mocked(getSpace).mockResolvedValue({ ...space, id: 99, name: '최신 선택 공간' })
+    const { wrapper, router } = await setup()
+    await fill(wrapper)
+    await wrapper.get('form').trigger('submit')
+    await router.push('/reservations/new?spaceId=99')
+    await flushPromises()
+    const state = wrapper.findComponent(ReservationCreateView).vm as unknown as { error: string; receipt: unknown }
+    const message = state.error
+    expect(message).toContain('이전 예약 요청')
+    if (outcome === '성공') resolve(receipt); else reject(new Error('늦은 예약 오류'))
+    await flushPromises()
+    expect((wrapper.get('#spaceId').element as HTMLSelectElement).value).toBe('99')
+    expect(state.receipt).toBeNull()
+    expect(state.error).toBe(message)
+    wrapper.unmount()
+  })
 })

@@ -30,6 +30,6 @@
 
 ## 독립 리뷰와 남은 항목
 
-Superpowers requesting-code-review의 독립 리뷰어 Subagent가 기준 origin/main·HEAD `a02dcb6` 대비 실제 미커밋 변경과 신규 소스·테스트를 요구사항·API 문서와 대조했다. Critical 0·Important 0·Minor 1이다. Minor는 취소 성공 후 확인 영역과 목록이 다시 생성될 때 결과 안내 등으로 키보드 포커스를 옮기는 개선이다. 취소 전 확인 제목·돌아가기 포커스는 구현했으며 성공 후 복원은 후속 접근성 보강으로 남긴다. 중요한 수정이 없어 중복 리뷰하지 않았다. 리뷰어는 diff 검사를 실행했으며 테스트·빌드·실제 HTTP를 재실행하지 않았다.
+Superpowers requesting-code-review의 독립 리뷰어 Subagent가 기준 origin/main·HEAD `a02dcb6` 대비 실제 미커밋 변경과 신규 소스·테스트를 요구사항·API 문서와 대조했다. Critical 0·Important 0·Minor 1이다. Minor는 취소 성공 후 확인 영역과 목록이 다시 생성될 때 결과 안내 등으로 키보드 포커스를 옮기는 개선이다. 취소 전 확인 제목·돌아가기 포커스는 구현했으며 성공 후 복원은 당시 후속으로 남겼고 이후 [품질 보강](frontend-quality.md)에서 성공 안내로 포커스를 옮기도록 수정했다. 중요한 수정이 없어 중복 리뷰하지 않았다. 리뷰어는 diff 검사를 실행했으며 테스트·빌드·실제 HTTP를 재실행하지 않았다.
 
-브라우저 검증, 성공 후 포커스 개선과 기존 개발 의존성 audit 항목이 남아 있다. 커밋·push는 하지 않았다.
+성공 후 포커스 개선과 지연 응답 회귀 테스트의 최신 검증은 [frontend-quality.md](frontend-quality.md)를 따른다. 브라우저 검증과 기존 개발 의존성 audit 항목이 남아 있다. 커밋·push는 하지 않았다.
