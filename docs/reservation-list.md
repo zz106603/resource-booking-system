@@ -1,5 +1,7 @@
 # 예약 목록 조회 API
 
+Vue의 `/reservations` 화면에서 필터·페이지 조회와 취소를 제공한다. 화면 계약과 최신 프런트엔드 검증은 [frontend-reservation-list.md](frontend-reservation-list.md)를 따른다. 아래는 백엔드 구현 당시 계약·검증 기록이다.
+
 ## 승인한 계약
 
 Swagger UI의 필터 예시는 [swagger.md](swagger.md)를 따른다. 선택 필터 예시는 서버 기본값이 아니며, from/to를 함께 지정하는 계약과 미지정·빈 값의 구분은 유지한다.

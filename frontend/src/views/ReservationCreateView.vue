@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ApiError } from '../api/client'
+import { combineSeoulDateTime as combineDateTime, halfHourOptions as timeOptions } from '../utils/seoulTime'
 import { getSpace, listSpaces, type Space, type SpacePage } from '../api/spaces'
 import { createReservation, listConfirmedIntervals, seoulInputToOffset, validateReservation, type Reservation, type ReservationErrors, type ReservedInterval } from '../api/reservations'
 
@@ -14,16 +15,6 @@ const startDate = ref('')
 const startTime = ref('')
 const endDate = ref('')
 const endTime = ref('')
-const timeOptions = Array.from({ length: 49 }, (_, index) =>
-  `${String(Math.floor(index / 2)).padStart(2, '0')}:${index % 2 === 0 ? '00' : '30'}`)
-function combineDateTime(date: string, time: string): string {
-  if (!date || !time) return ''
-  if (time !== '24:00') return `${date}T${time}`
-  const midnight = Date.parse(`${date}T00:00:00Z`)
-  if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return ''
-  const nextDay = new Date(midnight + 86400000).toISOString()
-  return /^\d{4}-/.test(nextDay) ? `${nextDay.slice(0, 10)}T00:00` : ''
-}
 const startAt = computed(() => combineDateTime(startDate.value, startTime.value))
 const endAt = computed(() => combineDateTime(endDate.value, endTime.value))
 const loading = ref(false)
@@ -204,7 +195,7 @@ onBeforeUnmount(() => { active = false; pageController?.abort(); selectionContro
     <article v-if="receipt" class="detail-panel" aria-labelledby="success-title">
       <h2 id="success-title" role="status">예약이 완료되었습니다.</h2>
       <dl><dt>예약 번호</dt><dd>{{ receipt.id }}</dd><dt>공간</dt><dd>{{ receiptSpace }} (ID {{ receipt.spaceId }})</dd><dt>예약자</dt><dd>{{ receipt.bookerName }}</dd><dt>시작 (Asia/Seoul)</dt><dd><time :datetime="receipt.startAt">{{ displayTime.format(new Date(receipt.startAt)) }}</time></dd><dt>종료 (Asia/Seoul)</dt><dd><time :datetime="receipt.endAt">{{ displayTime.format(new Date(receipt.endAt)) }}</time></dd></dl>
-      <div class="form-actions"><RouterLink :to="`/spaces/${receipt.spaceId}`">공간 상세</RouterLink><button type="button" @click="newReservation">새 예약 입력</button></div>
+      <div class="form-actions"><RouterLink :to="`/spaces/${receipt.spaceId}`">공간 상세</RouterLink><RouterLink to="/reservations">예약 목록</RouterLink><button type="button" @click="newReservation">새 예약 입력</button></div>
     </article>
     <form v-else class="space-form" novalidate :aria-busy="submitting" @submit.prevent="submit">
       <p v-if="error" role="alert" class="field-error">{{ error }}</p>
@@ -250,7 +241,7 @@ onBeforeUnmount(() => { active = false; pageController?.abort(); selectionContro
         </div>
       </fieldset>
       <p id="time-help" class="form-help">00:00~24:00에서 30분 단위로 선택합니다. 24:00은 선택한 날짜의 다음 날 00:00입니다. 시작은 최소 30분을 확보할 수 있는 시간, 종료는 선택한 시작부터 겹치지 않는 시간만 선택할 수 있습니다. 맞닿는 예약은 허용됩니다. 다른 사용자의 동시 예약은 최종 서버 검사에서 409가 될 수 있습니다.</p>
-      <p class="form-help">요청은 자동 재시도하지 않습니다. 응답이 끊긴 경우 Swagger 예약 목록에서 생성 여부를 확인하세요. 이 화면을 떠나도 서버의 예약 처리는 취소되지 않습니다.</p>
+      <p class="form-help">요청은 자동 재시도하지 않습니다. 응답이 끊긴 경우 예약 목록에서 생성 여부를 확인하세요. 이 화면을 떠나도 서버의 예약 처리는 취소되지 않습니다.</p>
       <p v-if="submitting" role="status">예약을 생성하는 중입니다…</p>
       <div class="form-actions"><RouterLink to="/spaces">목록으로</RouterLink><button type="submit" :disabled="submitting || preloading || !selected || !availabilityReady">{{ submitting ? '예약 중…' : '예약 생성' }}</button></div>
     </form>

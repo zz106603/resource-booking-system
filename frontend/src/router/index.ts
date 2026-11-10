@@ -8,6 +8,7 @@ const router = createRouter({
     { path: '/spaces/new', component: () => import('../views/SpaceCreateView.vue') },
     { path: '/spaces/:id', component: () => import('../views/SpaceDetailView.vue') },
     { path: '/reservations/new', component: () => import('../views/ReservationCreateView.vue') },
+    { path: '/reservations', component: () => import('../views/ReservationListView.vue') },
     { path: '/:pathMatch(.*)*', component: () => import('../views/NotFoundView.vue') },
   ],
 })

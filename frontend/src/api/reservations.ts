@@ -39,7 +39,7 @@ export interface ReservationInput { spaceId: string; bookerName: string; startAt
 export type ReservationErrors = Partial<Record<keyof ReservationInput, string>>
 export interface Reservation {
   id: number; spaceId: number; bookerName: string; startAt: string; endAt: string
-  status: 'CONFIRMED'; createdAt: string; cancelledAt: null
+  status: 'CONFIRMED' | 'CANCELLED'; createdAt: string; cancelledAt: string | null
 }
 
 export function seoulInputToOffset(value: string): string | null {
@@ -72,13 +72,55 @@ export async function createReservation(input: ReservationInput): Promise<Reserv
   const endAt = seoulInputToOffset(input.endAt)
   if (!startAt || !endAt) throw new ApiError('INVALID_REQUEST', '예약 시각을 확인해 주세요.')
   const body = await postJson('/api/reservations', { spaceId: Number(input.spaceId), bookerName: input.bookerName, startAt, endAt })
-  if (typeof body !== 'object' || body === null) throw new ApiError('INVALID_RESPONSE', '예약 응답을 확인할 수 없습니다. 등록 여부를 확인해 주세요.')
-  const value = body as Record<string, unknown>
-  if (typeof value.id !== 'number' || !Number.isSafeInteger(value.id) || value.id < 1
-    || value.spaceId !== Number(input.spaceId) || typeof value.bookerName !== 'string'
-    || value.status !== 'CONFIRMED' || value.cancelledAt !== null
-    || ![value.startAt, value.endAt, value.createdAt].every(v => typeof v === 'string' && Number.isFinite(Date.parse(v)))) {
+  const value = parseReservation(body)
+  if (value.spaceId !== Number(input.spaceId) || value.status !== 'CONFIRMED') {
     throw new ApiError('INVALID_RESPONSE', '예약 응답을 확인할 수 없습니다. 등록 여부를 확인해 주세요.')
   }
+  return value
+}
+
+export interface ReservationFilters { spaceId: string; status: string; from: string; to: string }
+export type FilterErrors = Partial<Record<keyof ReservationFilters, string>>
+export interface ReservationPage { content: Reservation[]; page: number; size: number; totalElements: number; totalPages: number }
+function isCount(value: unknown): value is number { return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 }
+function isDate(value: unknown): value is string { return typeof value === 'string' && Number.isFinite(Date.parse(value)) }
+function parseReservation(body: unknown): Reservation {
+  if (typeof body !== 'object' || body === null) throw new ApiError('INVALID_RESPONSE', '예약 응답을 확인할 수 없습니다.')
+  const value = body as Record<string, unknown>
+  if (!isCount(value.id) || value.id < 1 || !isCount(value.spaceId) || value.spaceId < 1
+    || typeof value.bookerName !== 'string' || ![value.startAt, value.endAt, value.createdAt].every(isDate)
+    || !((value.status === 'CONFIRMED' && value.cancelledAt === null) || (value.status === 'CANCELLED' && isDate(value.cancelledAt)))) {
+    throw new ApiError('INVALID_RESPONSE', '예약 응답을 확인할 수 없습니다.')
+  }
   return value as unknown as Reservation
+}
+export function validateReservationFilters(filters: ReservationFilters): FilterErrors {
+  const errors: FilterErrors = {}
+  if (filters.spaceId && (!/^\d+$/.test(filters.spaceId) || !isCount(Number(filters.spaceId)) || Number(filters.spaceId) < 1)) errors.spaceId = '공간을 올바르게 선택해 주세요.'
+  if (filters.status && !['CONFIRMED', 'CANCELLED'].includes(filters.status)) errors.status = '올바른 상태를 선택해 주세요.'
+  if (!!filters.from !== !!filters.to) errors[filters.from ? 'to' : 'from'] = '조회 시작과 종료를 함께 입력해 주세요.'
+  const from = seoulInputToOffset(filters.from)
+  const to = seoulInputToOffset(filters.to)
+  if (filters.from && !from) errors.from = '조회 시작 날짜와 시간을 확인해 주세요.'
+  if (filters.to && !to) errors.to = '조회 종료 날짜와 시간을 확인해 주세요.'
+  if (from && to && Date.parse(from) >= Date.parse(to)) errors.to = '조회 종료는 시작보다 늦어야 합니다.'
+  return errors
+}
+export async function listReservations(filters: ReservationFilters, page: number, signal?: AbortSignal): Promise<ReservationPage> {
+  if (Object.keys(validateReservationFilters(filters)).length || !isCount(page) || page * 20 > 2147483647) throw new ApiError('INVALID_REQUEST', '조회 조건을 확인해 주세요.')
+  const query = new URLSearchParams({ page: String(page), size: '20' })
+  if (filters.spaceId) query.set('spaceId', filters.spaceId)
+  if (filters.status) query.set('status', filters.status)
+  if (filters.from && filters.to) { query.set('from', seoulInputToOffset(filters.from)!); query.set('to', seoulInputToOffset(filters.to)!) }
+  const body = await getJson(`/api/reservations?${query}`, signal)
+  if (typeof body !== 'object' || body === null) throw new ApiError('INVALID_RESPONSE', '예약 목록 응답을 확인할 수 없습니다.')
+  const value = body as Record<string, unknown>
+  if (!Array.isArray(value.content) || value.page !== page || value.size !== 20 || !isCount(value.totalElements) || !isCount(value.totalPages)) throw new ApiError('INVALID_RESPONSE', '예약 목록 응답을 확인할 수 없습니다.')
+  return { content: value.content.map(parseReservation), page, size: 20, totalElements: value.totalElements, totalPages: value.totalPages }
+}
+export async function cancelReservation(id: number): Promise<Reservation> {
+  if (!isCount(id) || id < 1) throw new ApiError('INVALID_REQUEST', '예약 ID를 확인해 주세요.')
+  const value = parseReservation(await postJson(`/api/reservations/${id}/cancel`, {}))
+  if (value.id !== id || value.status !== 'CANCELLED') throw new ApiError('INVALID_RESPONSE', '취소 결과를 확인할 수 없습니다. 목록을 갱신해 주세요.')
+  return value
 }
