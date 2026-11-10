@@ -67,4 +67,4 @@ AC11은 별도 DB 연결과 동시 출발 장치를 사용하고 모든 작업 �
 
 ## 프런트엔드 단계
 
-백엔드 MVP와 분리해 기존 React 계획을 Vue 3·TypeScript·Vite로 변경했다. 공간 목록·페이지 이동과 로딩·빈 결과·오류·재시도를 제공한다. 페이지는 0부터·20개 고정이며 ID 오름차순이다. 표시 시간대는 Asia/Seoul이다. 공간 등록·상세 화면은 입력 검증·서버 필드 오류·중복 제출 방지·등록 후 실제ID 상세 이동을 포함한다. 예약 생성·목록·취소 화면은 후속 구현이며 백엔드 기능과 화면 완료 여부를 구분한다. 실행은 [frontend-setup.md](frontend-setup.md), 화면 계약·검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다.
+백엔드 MVP와 분리해 기존 React 계획을 Vue 3·TypeScript·Vite로 변경했다. 공간 목록·페이지 이동과 로딩·빈 결과·오류·재시도를 제공한다. 페이지는 0부터·20개 고정이며 ID 오름차순이다. 표시 시간대는 Asia/Seoul이다. 공간 등록·상세 화면은 입력 검증·서버 필드 오류·중복 제출 방지·등록 후 실제ID 상세 이동을 포함한다. 예약 생성은 공간 선택·서울 시각 입력·검증·중복409 처리·성공 결과를 제공한다([계약·검증](frontend-reservation-create.md)). 예약 목록·취소 화면은 후속 구현이며 백엔드 기능과 화면 완료 여부를 구분한다. 실행은 [frontend-setup.md](frontend-setup.md), 화면 계약·검증은 [frontend-space-screens.md](frontend-space-screens.md)를 따른다.

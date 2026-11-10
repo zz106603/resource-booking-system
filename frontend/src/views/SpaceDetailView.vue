@@ -41,6 +41,7 @@ onBeforeUnmount(() => { requestId++; controller?.abort() })
     <div v-if="loading" class="notice" role="status">공간 상세를 불러오는 중입니다…</div>
     <div v-else-if="error" class="notice error-state"><p role="alert">{{ error }}</p><button v-if="retryable" type="button" @click="load">다시 시도</button></div>
     <article v-else-if="space" class="detail-panel">
+      <RouterLink :to="{ path: '/reservations/new', query: { spaceId: space.id } }" class="button-link">이 공간 예약하기</RouterLink>
       <span class="capacity">{{ space.capacity }}명</span>
       <h2>공간 소개</h2><p class="description">{{ space.description || '등록된 설명이 없습니다.' }}</p>
       <dl><dt>공간 ID</dt><dd>{{ space.id }}</dd><dt>등록 시각 (Asia/Seoul)</dt><dd><time :datetime="space.createdAt">{{ time.format(new Date(space.createdAt)) }}</time></dd></dl>

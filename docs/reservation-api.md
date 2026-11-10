@@ -2,6 +2,8 @@
 
 Swagger UI의 미래 예약 예시와 실제 공간·예약 ID를 사용하는 실행 순서는 [swagger.md](swagger.md)를 따른다. 중복 생성·시작 후 취소에 관한 기존 규칙은 그대로 적용된다.
 
+Vue 예약 생성 화면의 공간 선택·서울 시각 입력·409 처리와 최신 검증은 [frontend-reservation-create.md](frontend-reservation-create.md)를 따른다. 아래 결과는 백엔드 구현 당시 기록이다.
+
 ## 범위와 구현 순서
 
 [요구사항](requirements.md)의 예약 생성·취소와 동일 공간 중복 방지를 다룬다. 이 문서의 초기 구현 범위에는 예약 목록(AC10), 인증, 시간 변경, 프런트엔드를 포함하지 않았다. 이후 예약 목록의 승인 계약과 검증은 [reservation-list.md](reservation-list.md)에 별도로 기록한다.
