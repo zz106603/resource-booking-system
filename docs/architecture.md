@@ -4,7 +4,9 @@
 
 공간 등록·조회는 `space` 패키지와 Flyway V2의 `spaces`, 예약 생성·취소·목록은 `reservation` 패키지와 V3의 `reservations`로 구현했다. V4는 CONFIRMED 한정 배타 제약을 추가하며 V1~V3는 보존한다. 실행 안내는 [backend-setup.md](backend-setup.md), API 계약은 [space-api.md](space-api.md) 및 [reservation-api.md](reservation-api.md), 최신 동시성 설계·검증은 [reservation-concurrency.md](reservation-concurrency.md), 예약 목록 AC10의 계약·검증은 [reservation-list.md](reservation-list.md), 수용 기준은 [requirements.md](requirements.md)를 따른다.
 
-단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 `backend/`, `frontend/`, `docs/`와 루트 `compose.yaml`로 구성한다. 기존 React 계획을 Vue 3·TypeScript·Vite로 변경했으며 프런트엔드는 초기 환경과 공간 목록을 구현했다.
+단일 Spring Boot 애플리케이션과 PostgreSQL로 시작한다. 분산 시스템의 복잡도 없이 트랜잭션과 동시성 제어를 검증하기 위해서다. 저장소는 `backend/`, `frontend/`, `docs/`와 루트 `compose.yaml`로 구성한다. 기존 React 계획을 Vue 3·TypeScript·Vite로 변경했으며 공간 목록·등록·상세와 예약 생성·목록·취소 화면을 구현했다.
+
+예약 목록은 ReservationListView의 로컬 초안/적용 필터와 페이지 상태를 사용한다. SpaceFilterSelect는 공간을 20개씩 조회하며 페이지 이동 후에도 선택을 보존한다. 목록의 공간은 ID·상세 링크로 표시해 행마다 이름 조회를 추가하지 않는다. 서울 날짜·30분 단위 시간 입력 결합은 생성 화면과 작은 공통 함수로 공유한다. 취소는 확인 후 명시적 POST 1회와 같은 조건의 GET 갱신으로 처리하며, 취소 성공과 후속 조회 실패를 분리한다. 전역 상태·추가 라이브러리·백엔드 계약 변경은 없다. 상세는 [frontend-reservation-list.md](frontend-reservation-list.md)를 따른다.
 
 요청 흐름은 HTTP API → 애플리케이션 서비스 → 도메인 규칙 및 영속성 → PostgreSQL이다. 기능별 `space`, `reservation` 패키지와 작은 공통 오류 처리 영역을 제안한다. 별도 Gradle 멀티모듈이나 범용 프레임워크는 도입하지 않는다.
 

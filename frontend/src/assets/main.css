@@ -61,3 +61,14 @@ dd { margin: 4px 0 0; }
 .site-header nav { display: flex; flex-wrap: wrap; gap: 16px; }
 .date-time-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 600px) { .date-time-fields { grid-template-columns: 1fr; } }
+.reservation-filters, .cancel-confirmation { background: white; border: 1px solid #d8e2dc; border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+.filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.filter-actions, .space-filter-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.space-filter-pages { margin-top: 12px; font-size: 12px; }
+.table-scroll { overflow-x: auto; background: white; border: 1px solid #d8e2dc; border-radius: 12px; }
+.reservation-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.reservation-table caption { text-align: left; padding: 16px; font-weight: 650; }
+.reservation-table th, .reservation-table td { padding: 14px; border-top: 1px solid #d8e2dc; text-align: left; }
+.reservation-table th, .reservation-table time { white-space: nowrap; }
+.reservation-table td { overflow-wrap: anywhere; min-width: 80px; }
+@media (max-width: 600px) { .filter-grid { grid-template-columns: 1fr; } .site-header { flex-wrap: wrap; } }
